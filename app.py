@@ -125,10 +125,11 @@ def get_fallback_analysis(errore=""):
         "anatomia_attacco": "Simulazione non disponibile."
     }
 
+# --- AGENTE 1: TRIAGE (Estrazione veloce con Llama 8B) ---
 def analyze_article(title, content):
     llm = ChatGroq(
         temperature=0.1, 
-        model_name="llama-3.1-8b-instant", 
+        model_name="llama-3.1-8b-instant", # Manteniamo l'8B per risparmiare token sul JSON
         groq_api_key=GROQ_API_KEY,
         max_tokens=4000, 
         model_kwargs={"response_format": {"type": "json_object"}}
@@ -187,9 +188,14 @@ def analyze_article(title, content):
     except Exception as e:
         return get_fallback_analysis(f"Errore generico: {str(e)}")
 
+# --- AGENTE 2: INVESTIGATORE SOC (Deep Dive con Llama 70B) ---
 def stream_deep_dive(context, question):
-    llm = ChatGroq(temperature=0.3, model_name="llama-3.1-8b-instant", groq_api_key=GROQ_API_KEY)
-    prompt = f"Sei un Security Engineer. Rispondi in italiano in modo tecnico. Contesto: {context}. Domanda: {question}"
+    llm = ChatGroq(
+        temperature=0.3, 
+        model_name="llama-3.3-70b-versatile", # IL NUOVO AGENTE PER LA CHAT
+        groq_api_key=GROQ_API_KEY
+    )
+    prompt = f"Sei un Security Engineer Senior. Rispondi in italiano in modo molto tecnico. Contesto: {context}. Domanda: {question}"
     for chunk in llm.stream(prompt):
         yield chunk.content
 
@@ -264,13 +270,16 @@ else:
             st.error(a.get('riassunto'))
         
         st.markdown("---")
+        
+        # DEFINIAMO LE DUE COLONNE PRINCIPALI
         col1, col2 = st.columns([1.5, 1])
         
+        # --- COLONNA DI SINISTRA ---
         with col1:
             st.markdown("#### 📝 Executive Summary")
             st.info(a.get('riassunto'))
             
-            st.markdown("#### 💬 Chat con l'Esperto SOC")
+            st.markdown("#### 💬 Chat con l'Esperto SOC (Modello 70B)")
             with st.form(key="custom_chat_form", clear_on_submit=True):
                 custom_q = st.text_input("Approfondisci tecnicamente questo alert:", max_chars=200)
                 if st.form_submit_button("Invia Domanda") and custom_q:
@@ -299,19 +308,35 @@ else:
                     st.markdown(html_timeline, unsafe_allow_html=True)
                 else:
                     st.write("Dati strutturati per la timeline non disponibili per questo attacco.")
-                    
-        with col2:
-            st.markdown("#### 🔍 Investigazione")
-            domande = a.get('domande_esplorative', [])
-            if domande:
-                for idx, domanda in enumerate(domande):
-                    if st.button(f"🔎 {domanda}", key=f"btn_dom_{idx}"):
-                        st.session_state.active_question = domanda
-                        st.session_state.trigger_stream = True
-                        st.rerun() 
-            else:
-                st.write("Nessuna domanda disponibile.")
             
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # --- SEZIONE INFERIORE: Investigazione e Raccomandazioni affiancate ---
+            sub_col1, sub_col2 = st.columns(2)
+            
+            with sub_col1:
+                st.markdown("#### 🔍 Investigazione")
+                domande = a.get('domande_esplorative', [])
+                if domande:
+                    for idx, domanda in enumerate(domande):
+                        if st.button(f"🔎 {domanda}", key=f"btn_dom_{idx}"):
+                            st.session_state.active_question = domanda
+                            st.session_state.trigger_stream = True
+                            st.rerun() 
+                else:
+                    st.write("Nessuna domanda disponibile.")
+                    
+            with sub_col2:
+                st.markdown("#### 🛡️ Raccomandazioni")
+                with st.container(border=True):
+                    recs = a.get('raccomandazioni_difesa', [])
+                    if recs:
+                        for i, rec in enumerate(recs, 1): st.markdown(f"**{i}.** {rec}")
+                    else:
+                        st.write("Nessuna raccomandazione specifica.")
+                    
+        # --- COLONNA DI DESTRA ---
+        with col2:
             st.markdown("#### 🎯 MITRE ATT&CK TTPs")
             ttps = a.get('mitre_attack_ttp', [])
             if ttps:
@@ -337,14 +362,6 @@ else:
                 st.markdown("#### 💥 Impatto sui Sistemi")
                 st.write(a.get('impatto_tecnico'))
 
-            st.markdown("#### 🛡️ Raccomandazioni")
-            with st.container(border=True):
-                recs = a.get('raccomandazioni_difesa', [])
-                if recs:
-                    for i, rec in enumerate(recs, 1): st.markdown(f"**{i}.** {rec}")
-                else:
-                    st.write("Nessuna raccomandazione specifica.")
-
     # --- SEZIONE RISPOSTA E TRIGGER SCROLL ---
     if st.session_state.get('trigger_stream', False):
         st.markdown("---")
@@ -352,7 +369,7 @@ else:
         ctx = f"Articolo: {current_art['title']}. Riassunto: {a.get('riassunto')}"
         
         with st.chat_message("assistant", avatar="🤖"):
-            # Genera prima tutta la risposta a schermo
+            # Genera prima tutta la risposta a schermo usando il 70B
             full_resp = st.write_stream(stream_deep_dive(ctx, st.session_state.active_question))
             
         st.session_state.deep_dive_response = full_resp
@@ -367,5 +384,4 @@ else:
         with st.chat_message("assistant", avatar="🤖"):
             st.write(st.session_state.deep_dive_response)
         
-        # Scorre giù anche se la pagina viene ricaricata (es: chiudendo un expander)
         force_scroll_to_bottom()
