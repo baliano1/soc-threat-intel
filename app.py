@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 # --- 1. CONFIGURAZIONE PAGINA (DEVE ESSERE IL PRIMO COMANDO) ---
 st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-# --- 2. CSS PER RIMUOVERE IL MARGINE SUPERIORE ---
+# --- 2. CSS PER RIMUOVERE IL MARGINE SUPERIORE E JS PER SCROLL ---
 st.markdown(
     """
     <style>
@@ -38,6 +38,18 @@ def extract_json_from_response(text):
     if match:
         return match.group(0)
     return text
+
+def scroll_to_bottom():
+    """Forza il browser a scorrere fluidamente verso il basso"""
+    js = """
+    <script>
+        const main_container = window.parent.document.querySelector('.main');
+        if (main_container) {
+            main_container.scrollTo({ top: main_container.scrollHeight, behavior: 'smooth' });
+        }
+    </script>
+    """
+    components.html(js, height=0)
 
 @st.cache_data(ttl=300)
 def fetch_rss_feeds():
@@ -165,7 +177,6 @@ def stream_deep_dive(context, question):
         yield chunk.content
 
 # --- INTERFACCIA UTENTE ---
-# Titolo centrato e senza margini superiori extra
 st.markdown("<h1 style='text-align: center; margin-top: 0px;'>🛡️ SOC Threat Intelligence Explorer</h1>", unsafe_allow_html=True)
 
 with st.spinner("Sincronizzazione Feed RSS in corso..."):
@@ -314,7 +325,10 @@ else:
                 else:
                     st.write("Nessuna raccomandazione specifica.")
 
+    # --- SEZIONE RISPOSTA E TRIGGER SCROLL ---
     if st.session_state.get('trigger_stream', False):
+        scroll_to_bottom() # <--- INIEZIONE DELLO SCROLL QUI
+        
         st.markdown("---")
         st.markdown(f"### 💡 Risposta in tempo reale: *{st.session_state.active_question}*")
         ctx = f"Articolo: {current_art['title']}. Riassunto: {a.get('riassunto')}"
@@ -324,6 +338,8 @@ else:
         st.session_state.trigger_stream = False
         
     elif 'deep_dive_response' in st.session_state and st.session_state.get('active_question'):
+        scroll_to_bottom() # <--- INIEZIONE DELLO SCROLL ANCHE SE RICARICA LA PAGINA CON LA RISPOSTA GIÀ PRONTA
+        
         st.markdown("---")
         st.markdown(f"### 💡 Risposta: *{st.session_state.active_question}*")
         with st.chat_message("assistant", avatar="🤖"):
