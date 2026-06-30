@@ -34,9 +34,11 @@ def clean_html(raw_html):
     return BeautifulSoup(raw_html, "html.parser").get_text(separator=" ", strip=True)
 
 def extract_json_from_response(text):
-    match = re.search(r'\{.*\}', text, re.DOTALL)
-    if match:
-        return match.group(0)
+    # Metodo più robusto: prende dal primo '{' all'ultimo '}'
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end != -1:
+        return text[start:end+1]
     return text
 
 def scroll_to_bottom():
@@ -101,9 +103,9 @@ def fetch_rss_feeds():
             pass 
     return articles
 
-def get_fallback_analysis():
+def get_fallback_analysis(errore=""):
     return {
-        "riassunto": "L'analisi automatica non è andata a buon fine a causa di contenuti non supportati dal LLM o troppo brevi.",
+        "riassunto": f"L'analisi automatica non è andata a buon fine. Dettaglio: {errore}",
         "vettore_attacco": "Dato non disponibile", 
         "tecnica_exploit": "Dato non disponibile", 
         "timeline_attacco": [], 
@@ -124,8 +126,14 @@ def analyze_article(title, content):
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
+    # Prompt corretto: regole rigide per impedire al LLM di invalidare il JSON
     prompt = f"""
     Analizza questo bollettino cyber e restituisci ESCLUSIVAMENTE un oggetto JSON valido in italiano.
+    
+    REGOLE FONDAMENTALI PER IL JSON:
+    1. Fai l'escape di tutte le virgolette doppie (\\") all'interno dei testi.
+    2. Usa '\\n' per i ritorni a capo, non andare mai a capo fisicamente all'interno di una stringa JSON.
+    3. Non aggiungere alcun testo introduttivo o conclusivo fuori dalle parentesi graffe {{ }}.
     
     Struttura JSON obbligatoria (chiavi in minuscolo):
     {{
@@ -133,9 +141,9 @@ def analyze_article(title, content):
         "vettore_attacco": "Testo descrittivo...",
         "tecnica_exploit": "Testo descrittivo...",
         "impatto_tecnico": "Testo descrittivo...",
-        "anatomia_attacco": "Testo formattato in Markdown con blocchi di codice per mostrare script/payload realistici...",
-        "mitre_attack_ttp": ["TTP1", "TTP2"], qualora non trovassi informazioni coerenti con un codice MITRE&ATTACK (es. T1566) inserisci "Dato non trovato/non disponibile", 
-        "indicatori_compromissione": ["IoC1", "IoC2"],qualora non trovassi informazioni coerenti con un IOC (IP segnalati, Hash, CVE ecc) inserisci "Dato non trovato/non disponibile",
+        "anatomia_attacco": "Testo con spiegazione...",
+        "mitre_attack_ttp": ["TTP1", "TTP2"],
+        "indicatori_compromissione": ["IoC1", "IoC2"],
         "raccomandazioni_difesa": ["Azione 1", "Azione 2"],
         "domande_esplorative": ["Domanda 1", "Domanda 2"],
         "timeline_attacco": [
@@ -167,8 +175,10 @@ def analyze_article(title, content):
 
         return clean_json
         
+    except json.JSONDecodeError as e:
+        return get_fallback_analysis(f"Errore di formattazione dati dall'AI (JSON Decode Error).")
     except Exception as e:
-        return get_fallback_analysis()
+        return get_fallback_analysis(f"Errore generico: {str(e)}")
 
 def stream_deep_dive(context, question):
     llm = ChatGroq(temperature=0.3, model_name="llama-3.1-8b-instant", groq_api_key=GROQ_API_KEY)
@@ -253,11 +263,12 @@ else:
             st.info(a.get('riassunto'))
             
             st.markdown("#### 💬 Chat con l'Esperto SOC")
-            with st.form(key="custom_chat_form"):
+            with st.form(key="custom_chat_form", clear_on_submit=True):
                 custom_q = st.text_input("Approfondisci tecnicamente questo alert:", max_chars=200)
                 if st.form_submit_button("Invia Domanda") and custom_q:
                     st.session_state.active_question = custom_q
                     st.session_state.trigger_stream = True
+                    st.rerun() # <-- Ricarica Immediata
 
             st.markdown("<br>", unsafe_allow_html=True)
             
@@ -285,10 +296,12 @@ else:
             st.markdown("#### 🔍 Investigazione")
             domande = a.get('domande_esplorative', [])
             if domande:
-                for domanda in domande:
-                    if st.button(f"🔎 {domanda}", key=domanda):
+                for idx, domanda in enumerate(domande):
+                    # Uso di un key univoco per il bottone
+                    if st.button(f"🔎 {domanda}", key=f"btn_dom_{idx}"):
                         st.session_state.active_question = domanda
                         st.session_state.trigger_stream = True
+                        st.rerun() # <-- Ricarica Immediata
             else:
                 st.write("Nessuna domanda disponibile.")
             
@@ -327,20 +340,24 @@ else:
 
     # --- SEZIONE RISPOSTA E TRIGGER SCROLL ---
     if st.session_state.get('trigger_stream', False):
-        scroll_to_bottom() # <--- INIEZIONE DELLO SCROLL QUI
-        
         st.markdown("---")
         st.markdown(f"### 💡 Risposta in tempo reale: *{st.session_state.active_question}*")
         ctx = f"Articolo: {current_art['title']}. Riassunto: {a.get('riassunto')}"
+        
+        # Esegue lo scroll PRIMA di iniziare a scrivere il testo, così l'utente vede il caricamento
+        scroll_to_bottom() 
+        
         with st.chat_message("assistant", avatar="🤖"):
             full_resp = st.write_stream(stream_deep_dive(ctx, st.session_state.active_question))
+            
         st.session_state.deep_dive_response = full_resp
         st.session_state.trigger_stream = False
         
     elif 'deep_dive_response' in st.session_state and st.session_state.get('active_question'):
-        scroll_to_bottom() # <--- INIEZIONE DELLO SCROLL ANCHE SE RICARICA LA PAGINA CON LA RISPOSTA GIÀ PRONTA
-        
         st.markdown("---")
         st.markdown(f"### 💡 Risposta: *{st.session_state.active_question}*")
         with st.chat_message("assistant", avatar="🤖"):
             st.write(st.session_state.deep_dive_response)
+        
+        # Esegue lo scroll alla fine se la risposta è già pronta a schermo
+        scroll_to_bottom()
