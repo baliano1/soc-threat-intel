@@ -2,6 +2,7 @@ import streamlit as st
 import feedparser
 from bs4 import BeautifulSoup
 import json
+import time
 from langchain_groq import ChatGroq
 from streamlit_autorefresh import st_autorefresh
 
@@ -11,6 +12,81 @@ st_autorefresh(interval=300000, limit=None, key="feed_autorefresh")
 
 # Recupero della chiave API dai segreti di Streamlit
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+
+# --- CSS PERSONALIZZATO PER ANIMAZIONE GUFETTO ---
+st.markdown("""
+<style>
+@keyframes owl_search {
+    0% { transform: translateX(0px); }
+    50% { transform: translateX(15px); }
+    100% { transform: translateX(0px); }
+}
+
+@keyframes binoculars_rotate {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-5deg); }
+    75% { transform: rotate(5deg); }
+}
+
+.owl_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 15px 0;
+    animation: owl_search 2s infinite ease-in-out;
+}
+
+.owl_face {
+    font-size: 48px;
+    font-weight: bold;
+}
+
+.binoculars {
+    font-size: 36px;
+    animation: binoculars_rotate 2s infinite ease-in-out;
+    transform-origin: center;
+}
+
+.countdown_box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 10px 0;
+    font-weight: bold;
+    font-size: 16px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.countdown_label {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.countdown_time {
+    font-size: 24px;
+    font-family: 'Courier New', monospace;
+}
+
+.pulse_indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #10b981;
+    margin-left: 8px;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+</style>
+""", unsafe_allow_html=True)
 
 def clean_html(raw_html):
     if not raw_html: return ""
@@ -101,6 +177,12 @@ def stream_deep_dive(context, question):
     for chunk in llm.stream(prompt):
         yield chunk.content
 
+def format_countdown(seconds):
+    """Formatta i secondi in MM:SS"""
+    minutes = seconds // 60
+    secs = seconds % 60
+    return f"{minutes:02d}:{secs:02d}"
+
 # --- INTERFACCIA UTENTE ---
 st.title("🛡️ SOC Threat Intelligence Explorer")
 
@@ -114,7 +196,40 @@ else:
         st.session_state.selected_article = articles[0]
 
     st.sidebar.header("📡 Live Feed Alerts")
+    
+    # --- ANIMAZIONE GUFETTO E CONTATORE ---
+    col1, col2 = st.sidebar.columns([1, 1])
+    with col1:
+        st.markdown("""
+        <div class="owl_container">
+            <span class="owl_face">🦉</span>
+            <span class="binoculars">🔭</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        # Placeholder per il contatore - verrà aggiornato
+        countdown_placeholder = st.sidebar.empty()
+    
+    # Inizializzazione del timer
+    if 'last_refresh_time' not in st.session_state:
+        st.session_state.last_refresh_time = time.time()
+    
+    # Calcolo del tempo rimanente (aggiornamento ogni 5 minuti = 300 secondi)
+    elapsed = time.time() - st.session_state.last_refresh_time
+    remaining = max(0, 300 - int(elapsed))
+    
+    # Aggiornamento del contatore
+    with countdown_placeholder.container():
+        st.markdown(f"""
+        <div class="countdown_box">
+            <div class="countdown_label">Prossimo refresh</div>
+            <div class="countdown_time">{format_countdown(remaining)}<span class="pulse_indicator"></span></div>
+        </div>
+        """, unsafe_allow_html=True)
+    
     st.sidebar.caption("Si aggiorna automaticamente ogni 5 minuti.")
+    st.sidebar.divider()
     
     for a in articles:
         btn_label = f"{a['source']}\n{a['title'][:50]}..."
