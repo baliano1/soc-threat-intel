@@ -10,12 +10,12 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
-st_autorefresh(interval=1000, limit=None, key="feed_autorefresh")
+st_autorefresh(interval=300000, limit=None, key="feed_autorefresh")
 
 # Recupero della chiave API dai segreti di Streamlit
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
-# --- CSS PERSONALIZZATO PER ANIMAZIONE GUFETTO ---
+# --- CSS PERSONALIZZATO PER ANIMAZIONE GUFETTO E TIMER ---
 st.markdown("""
 <style>
 @keyframes owl_search {
@@ -95,25 +95,6 @@ st.markdown("""
     margin: 10px 0;
     padding: 5px 0;
 }
-
-.technical_section {
-    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-    color: white;
-    padding: 15px;
-    border-radius: 8px;
-    margin: 10px 0;
-    border-left: 4px solid #1abc9c;
-}
-
-.anatomy_section {
-    background: #1e1e1e;
-    color: #f8f8f2;
-    padding: 20px;
-    border-radius: 8px;
-    margin: 15px 0;
-    border-left: 4px solid #ff5555;
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -160,10 +141,12 @@ def fetch_rss_feeds():
 
 def analyze_article(title, content):
     """Analizza l'articolo usando Groq con focus su dettagli dell'attacco"""
+    # Ho aumentato max_tokens a 4000 per permettere risposte lunghissime senza troncare il JSON
     llm = ChatGroq(
         temperature=0, 
         model_name="llama-3.1-8b-instant", 
         groq_api_key=GROQ_API_KEY,
+        max_tokens=4000, 
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
@@ -176,7 +159,7 @@ def analyze_article(title, content):
     
     Specifiche per la chiave "anatomia_attacco":
     Spiega dettagliatamente passo dopo passo come si sviluppa questa catena di attacco. 
-    IMPORTANTE: Se il testo del bollettino non descrive precisamente i dettagli tecnici del payload o dei comandi, inventa tu uno scenario di esempio realistico con variabili fittizie (es. un blocco di codice exploit di esempio, comandi PowerShell/Bash simulati, o tabelle con i passaggi dell'attaccante) usando formattazione Markdown strutturata per mostrare graficamente la dinamica tecnica.
+    IMPORTANTE: Usa liberamente la formattazione Markdown (tabelle, blocchi di codice, elenchi). Se il testo del bollettino non descrive precisamente i dettagli tecnici, inventa tu uno scenario di esempio realistico (es. codice exploit fittizio, comandi Bash/PowerShell) per mostrare visivamente e praticamente la dinamica.
 
     Articolo: {title}
     Testo: {content[:1500]}
@@ -207,7 +190,7 @@ def analyze_article(title, content):
         return clean_json
         
     except json.JSONDecodeError as e:
-        st.error(f"❌ Errore nel parsing JSON: {str(e)[:100]}")
+        st.error("❌ L'AI ha generato una risposta troppo lunga interrompendo il JSON. Ho caricato i dati di base.")
         return get_fallback_analysis()
     except Exception as e:
         st.error(f"❌ Errore durante l'analisi: {str(e)[:100]}")
@@ -215,7 +198,7 @@ def analyze_article(title, content):
 
 def get_fallback_analysis():
     return {
-        "riassunto": "Errore nell'elaborazione. Riprova.",
+        "riassunto": "Errore nell'elaborazione a causa di un output malformato. Prova a riavviare l'analisi.",
         "vettore_attacco": "Non disponibile",
         "tecnica_exploit": "Non disponibile",
         "timeline_attacco": "Non disponibile",
@@ -232,7 +215,7 @@ def stream_deep_dive(context, question):
     prompt = f"""Sei un Senior Security Engineer. RISPONDI RIGOROSAMENTE IN ITALIANO, in modo tecnico e professionale.
 Contesto: {context}
 Domanda dell'utente: {question}
-Fornisci azioni pratiche e schemi comandi se applicabili."""
+Fornisci azioni pratiche e schemi di comandi se applicabili."""
     
     for chunk in llm.stream(prompt):
         yield chunk.content
@@ -286,7 +269,7 @@ else:
         </div>
         """, unsafe_allow_html=True)
     
-    st.sidebar.caption("Si aggiorna automaticamente ogni 5 minutes.")
+    st.sidebar.caption("Si aggiorna automaticamente ogni 5 minuti.")
     st.sidebar.markdown('<div class="helper_text">👇 Scegli un bollettino da consultare</div>', unsafe_allow_html=True)
     st.sidebar.divider()
     
@@ -304,15 +287,15 @@ else:
     st.write(current_art['content'][:800] + "...")
 
     if st.button("🚀 Avvia Analisi AI Cloud", type="primary"):
-        with st.spinner("Estrazione TTP in corso sui server Groq..."):
+        with st.spinner("Estrazione dati e generazione simulazione in corso..."):
             st.session_state.analysis = analyze_article(current_art['title'], current_art['content'])
 
     if 'analysis' in st.session_state:
         analysis = st.session_state.analysis
         st.markdown("---")
         
-        # Bilanciamento colonne allargando la colonna di sinistra per l'anatomia dettagliata
-        col1, col2 = st.columns([1.4, 1])
+        # Bilanciamento colonne: la colonna sinistra è più larga per ospitare l'anatomia
+        col1, col2 = st.columns([1.5, 1])
         
         with col1:
             st.markdown("#### 📝 Riassunto")
@@ -326,13 +309,9 @@ else:
                     st.session_state.active_question = custom_q
                     st.session_state.trigger_stream = True
 
-            # NUOVA SEZIONE SOTTO LA CHAT RICHIESTA DALL'UTENTE
             st.markdown("#### 🔬 Anatomia dell'Attacco & Scenario di Simulazione")
-            st.markdown(f"""
-            <div class="anatomy_section">
-                {analysis.get('anatomia_attacco', 'Simulazione dello scenario non disponibile.')}
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.write(analysis.get('anatomia_attacco', 'Simulazione dello scenario non disponibile.'))
                     
         with col2:
             st.markdown("#### 🔍 Investigazione Tecnica")
@@ -359,44 +338,33 @@ else:
                 for ioc in iocs:
                     if str(ioc).strip(): st.code(str(ioc), language="text")
             else:
-                st.write("Nessun IoC disponibile nell'articolo.")
+                st.write("Nessun IoC esplicito trovato.")
 
-            # SEZIONI SPOSTATE SOTTO LA VOCE INDICATORI DI COMPROMISSIONE
+            # SEZIONI SPOSTATE NELLA COLONNA 2 CON CONTAINER NATIVI
             st.markdown("##### 🎯 Vettore di Attacco")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('vettore_attacco', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.write(analysis.get('vettore_attacco', 'Non disponibile'))
             
             st.markdown("##### ⚙️ Tecnica di Exploit")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('tecnica_exploit', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.write(analysis.get('tecnica_exploit', 'Non disponibile'))
             
             st.markdown("##### 📅 Timeline dell'Attacco")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('timeline_attacco', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.write(analysis.get('timeline_attacco', 'Non disponibile'))
             
             st.markdown("##### 💥 Impatto Tecnico")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('impatto_tecnico', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.write(analysis.get('impatto_tecnico', 'Non disponibile'))
             
             st.markdown("##### 🛡️ Raccomandazioni di Difesa")
-            raccomandazioni = analysis.get('raccomandazioni_difesa', [])
-            if isinstance(raccomandazioni, list) and raccomandazioni:
-                for i, rec in enumerate(raccomandazioni, 1):
-                    st.markdown(f"**{i}. {rec}**")
-            else:
-                st.write("Non disponibili")
+            with st.container(border=True):
+                raccomandazioni = analysis.get('raccomandazioni_difesa', [])
+                if isinstance(raccomandazioni, list) and raccomandazioni:
+                    for i, rec in enumerate(raccomandazioni, 1):
+                        st.markdown(f"**{i}.** {rec}")
+                else:
+                    st.write("Non disponibili")
 
     if st.session_state.get('trigger_stream', False):
         st.markdown("---")
