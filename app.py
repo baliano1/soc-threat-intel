@@ -284,13 +284,13 @@ else:
                     st.write("Nessun IoC rilevato nel testo.")
                 
                 st.divider()
-                st.markdown("**Vettore Iniziale:**")
+                st.markdown("#### 1️⃣ Vettore Iniziale")
                 st.write(a.get('vettore_attacco'))
                 
-                st.markdown("**Tecnica Exploit:**")
+                st.markdown("#### 💣Tecnica Exploit")
                 st.write(a.get('tecnica_exploit'))
                 
-                st.markdown("**Impatto sui Sistemi:**")
+                st.markdown("#### 💥Impatto sui Sistemi")
                 st.write(a.get('impatto_tecnico'))
 
             st.markdown("#### 🛡️ Raccomandazioni")
