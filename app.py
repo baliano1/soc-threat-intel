@@ -42,13 +42,17 @@ def extract_json_from_response(text):
     return text
 
 def scroll_to_bottom():
-    """Forza il browser a scorrere fluidamente verso il basso"""
+    """Forza il browser a scorrere fluidamente verso il basso con un ritardo tattico"""
     js = """
     <script>
-        const main_container = window.parent.document.querySelector('.main');
-        if (main_container) {
-            main_container.scrollTo({ top: main_container.scrollHeight, behavior: 'smooth' });
-        }
+        setTimeout(() => {
+            const doc = window.parent.document;
+            // Intercetta il container principale di Streamlit
+            const main_container = doc.querySelector('.main') || doc.querySelector('.block-container');
+            if (main_container) {
+                main_container.scrollTo({ top: main_container.scrollHeight, behavior: 'smooth' });
+            }
+        }, 500); // 500 millisecondi di ritardo per far respirare il DOM
     </script>
     """
     components.html(js, height=0)
