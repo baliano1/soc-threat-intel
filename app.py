@@ -34,25 +34,29 @@ def clean_html(raw_html):
     return BeautifulSoup(raw_html, "html.parser").get_text(separator=" ", strip=True)
 
 def extract_json_from_response(text):
-    # Metodo più robusto: prende dal primo '{' all'ultimo '}'
     start = text.find('{')
     end = text.rfind('}')
     if start != -1 and end != -1:
         return text[start:end+1]
     return text
 
-def scroll_to_bottom():
-    """Forza il browser a scorrere fluidamente verso il basso con un ritardo tattico"""
+def force_scroll_to_bottom():
+    """Script aggressivo: forza lo scroll appena iniettato e ripete per superare i lag di React"""
     js = """
     <script>
-        setTimeout(() => {
-            const doc = window.parent.document;
-            // Intercetta il container principale di Streamlit
-            const main_container = doc.querySelector('.main') || doc.querySelector('.block-container');
+        function scrollDown() {
+            const main_container = window.parent.document.querySelector('.main') || window.parent.document.querySelector('.block-container');
             if (main_container) {
                 main_container.scrollTo({ top: main_container.scrollHeight, behavior: 'smooth' });
             }
-        }, 500); // 500 millisecondi di ritardo per far respirare il DOM
+        }
+        
+        // Esegui immediatamente
+        scrollDown();
+        // Ripeti per sicurezza mentre il DOM si assesta
+        setTimeout(scrollDown, 300);
+        setTimeout(scrollDown, 800);
+        setTimeout(scrollDown, 1500);
     </script>
     """
     components.html(js, height=0)
@@ -130,7 +134,6 @@ def analyze_article(title, content):
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
-    # Prompt corretto: regole rigide per impedire al LLM di invalidare il JSON
     prompt = f"""
     Analizza questo bollettino cyber e restituisci ESCLUSIVAMENTE un oggetto JSON valido in italiano.
     
@@ -241,6 +244,7 @@ else:
                 if 'analysis' in st.session_state: del st.session_state.analysis
                 if 'deep_dive_response' in st.session_state: del st.session_state.deep_dive_response
                 if 'trigger_stream' in st.session_state: del st.session_state.trigger_stream
+                st.rerun()
 
     current_art = st.session_state.selected_article
     st.markdown(f"### 📰 {current_art['title']}")
@@ -272,7 +276,7 @@ else:
                 if st.form_submit_button("Invia Domanda") and custom_q:
                     st.session_state.active_question = custom_q
                     st.session_state.trigger_stream = True
-                    st.rerun() # <-- Ricarica Immediata
+                    st.rerun() 
 
             st.markdown("<br>", unsafe_allow_html=True)
             
@@ -301,11 +305,10 @@ else:
             domande = a.get('domande_esplorative', [])
             if domande:
                 for idx, domanda in enumerate(domande):
-                    # Uso di un key univoco per il bottone
                     if st.button(f"🔎 {domanda}", key=f"btn_dom_{idx}"):
                         st.session_state.active_question = domanda
                         st.session_state.trigger_stream = True
-                        st.rerun() # <-- Ricarica Immediata
+                        st.rerun() 
             else:
                 st.write("Nessuna domanda disponibile.")
             
@@ -348,14 +351,15 @@ else:
         st.markdown(f"### 💡 Risposta in tempo reale: *{st.session_state.active_question}*")
         ctx = f"Articolo: {current_art['title']}. Riassunto: {a.get('riassunto')}"
         
-        # Esegue lo scroll PRIMA di iniziare a scrivere il testo, così l'utente vede il caricamento
-        scroll_to_bottom() 
-        
         with st.chat_message("assistant", avatar="🤖"):
+            # Genera prima tutta la risposta a schermo
             full_resp = st.write_stream(stream_deep_dive(ctx, st.session_state.active_question))
             
         st.session_state.deep_dive_response = full_resp
         st.session_state.trigger_stream = False
+        
+        # ORA ESEGUE LO SCROLL: dopo che la finestra si è ingrandita al massimo
+        force_scroll_to_bottom()
         
     elif 'deep_dive_response' in st.session_state and st.session_state.get('active_question'):
         st.markdown("---")
@@ -363,5 +367,5 @@ else:
         with st.chat_message("assistant", avatar="🤖"):
             st.write(st.session_state.deep_dive_response)
         
-        # Esegue lo scroll alla fine se la risposta è già pronta a schermo
-        scroll_to_bottom()
+        # Scorre giù anche se la pagina viene ricaricata (es: chiudendo un expander)
+        force_scroll_to_bottom()
