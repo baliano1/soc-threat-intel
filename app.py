@@ -187,7 +187,7 @@ def fetch_rss_feeds():
     return articles
 
 def analyze_article(title, content):
-    """Analizza l'articolo usando Groq con focus su dettagli dell'attacco"""
+    # Inizializziamo Groq in modalità JSON per forzare l'output corretto
     llm = ChatGroq(
         temperature=0, 
         model_name="llama-3.1-8b-instant", 
@@ -195,70 +195,56 @@ def analyze_article(title, content):
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
+    prompt = f"""
+    Genera ESCLUSIVAMENTE un oggetto JSON valido. RISPONDI RIGOROSAMENTE IN ITALIANO.
+    Usa ESATTAMENTE queste tre chiavi, rigorosamente in minuscolo: "riassunto", "mitre_attack_ttp", "domande_esplorative".
+    
+    Struttura JSON richiesta:
+    {{
+        "riassunto": "Riassunto analitico di 4 frasi in italiano (Chi è attaccato, vettore d'attacco, impatto).",
+        "mitre_attack_ttp": ["Lista codici TTP o tecniche citate"],
+        "domande_esplorative": [
+            "Come funziona tecnicamente l'attacco citato?",
+            "Quali sono i metodi di mitigazione in rete?",
+            "Quali IoC cercare nei log?"
+        ]
+    }}
+    
+    Titolo: {title}
+    Testo: {content[:1500]} 
+    """
+    
+    # In LangChain i ChatModels restituiscono un oggetto con .content
+    response = llm.invoke(prompt)
+    
     try:
-        response = llm.invoke(prompt)
-        # Estrae il JSON dalla risposta
-        json_text = extract_json_from_response(response.content)
-        raw_json = json.loads(json_text)
-        
-        # Normalizza le chiavi
+        raw_json = json.loads(response.content)
         clean_json = {str(k).lower(): v for k, v in raw_json.items()}
         
-        # Verifica che tutte le chiavi essenziali siano presenti
-        required_keys = [
-            "riassunto", "vettore_attacco", "tecnica_exploit", "timeline_attacco",
-            "indicatori_compromissione", "impatto_tecnico", "mitre_attack_ttp",
-            "raccomandazioni_difesa", "domande_esplorative"
-        ]
-        
-        for key in required_keys:
-            if key not in clean_json:
-                if key in ["indicatori_compromissione", "mitre_attack_ttp", "raccomandazioni_difesa", "domande_esplorative"]:
-                    clean_json[key] = []
-                else:
-                    clean_json[key] = "Non disponibile"
-        
+        for key in ["risposta", "response", "analisi", "json", "output"]:
+            if key in clean_json and isinstance(clean_json[key], dict):
+                clean_json = {str(k).lower(): v for k, v in clean_json[key].items()}
+                break
+                
         return clean_json
         
-    except json.JSONDecodeError as e:
-        st.error(f"❌ Errore nel parsing JSON: {str(e)[:100]}")
-        return get_fallback_analysis()
     except Exception as e:
-        st.error(f"❌ Errore durante l'analisi: {str(e)[:100]}")
-        return get_fallback_analysis()
-
-def get_fallback_analysis():
-    """Ritorna un'analisi di fallback quando c'è un errore"""
-    return {
-        "riassunto": "Errore nell'elaborazione. Riprova.",
-        "vettore_attacco": "Non disponibile",
-        "tecnica_exploit": "Non disponibile",
-        "timeline_attacco": "Non disponibile",
-        "indicatori_compromissione": [],
-        "impatto_tecnico": "Non disponibile",
-        "mitre_attack_ttp": [],
-        "raccomandazioni_difesa": [],
-        "domande_esplorative": []
-    }
+        return {
+            "riassunto": "Errore di conversione JSON. Riprova l'analisi.",
+            "mitre_attack_ttp": [],
+            "domande_esplorative": []
+        }
 
 def stream_deep_dive(context, question):
-    """Chat esperto con streaming"""
     llm = ChatGroq(temperature=0.3, model_name="llama-3.1-8b-instant", groq_api_key=GROQ_API_KEY)
-    prompt = f"""Sei un Senior Security Engineer. RISPONDI RIGOROSAMENTE IN ITALIANO, in modo tecnico e professionale.
-Contesto: {context}
-Domanda dell'utente: {question}
-
-Sii specifico e pratico. Se la domanda riguarda come funziona un attacco, spiega step-by-step.
-Se la domanda riguarda mitigazione, fornisci azioni concrete."""
-    
+    prompt = f"""
+    Sei un Senior Security Engineer. RISPONDI RIGOROSAMENTE IN ITALIANO, in modo tecnico e professionale. 
+    Contesto: {context}
+    Domanda dell'utente: {question}
+    """
+    # Adattiamo lo streaming per Streamlit e ChatGroq
     for chunk in llm.stream(prompt):
         yield chunk.content
-
-def format_countdown(seconds):
-    """Formatta i secondi in MM:SS"""
-    minutes = seconds // 60
-    secs = seconds % 60
-    return f"{minutes:02d}:{secs:02d}"
 
 # --- INTERFACCIA UTENTE ---
 st.title("🛡️ SOC Threat Intelligence Explorer")
@@ -273,53 +259,15 @@ else:
         st.session_state.selected_article = articles[0]
 
     st.sidebar.header("📡 Live Feed Alerts")
-    
-    # --- ANIMAZIONE GUFETTO E CONTATORE ---
-    col1, col2 = st.sidebar.columns([1, 1])
-    with col1:
-        st.markdown("""
-        <div class="owl_container">
-            <span class="owl_face">🦉</span>
-            <span class="binoculars">🔭</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        countdown_placeholder = st.sidebar.empty()
-    
-    # Inizializzazione del timer
-    if 'refresh_start_time' not in st.session_state:
-        st.session_state.refresh_start_time = datetime.now()
-    
-    elapsed = (datetime.now() - st.session_state.refresh_start_time).total_seconds()
-    remaining = max(0, 300 - int(elapsed))
-    
-    if remaining == 0:
-        st.session_state.refresh_start_time = datetime.now()
-        remaining = 300
-    
-    with countdown_placeholder.container():
-        st.markdown(f"""
-        <div class="countdown_box">
-            <div class="countdown_label">Prossimo refresh</div>
-            <div class="countdown_time">{format_countdown(remaining)}<span class="pulse_indicator"></span></div>
-        </div>
-        """, unsafe_allow_html=True)
-    
     st.sidebar.caption("Si aggiorna automaticamente ogni 5 minuti.")
-    st.sidebar.markdown('<div class="helper_text">👇 Scegli un bollettino da consultare</div>', unsafe_allow_html=True)
-    st.sidebar.divider()
     
     for a in articles:
         btn_label = f"{a['source']}\n{a['title'][:50]}..."
         if st.sidebar.button(btn_label, use_container_width=True):
             st.session_state.selected_article = a
-            if 'analysis' in st.session_state: 
-                del st.session_state.analysis
-            if 'deep_dive_response' in st.session_state: 
-                del st.session_state.deep_dive_response
-            if 'trigger_stream' in st.session_state: 
-                del st.session_state.trigger_stream
+            if 'analysis' in st.session_state: del st.session_state.analysis
+            if 'deep_dive_response' in st.session_state: del st.session_state.deep_dive_response
+            if 'trigger_stream' in st.session_state: del st.session_state.trigger_stream
 
     current_art = st.session_state.selected_article
     st.markdown(f"### 📰 {current_art['title']}")
@@ -328,7 +276,10 @@ else:
 
     if st.button("🚀 Avvia Analisi AI Cloud", type="primary"):
         with st.spinner("Estrazione TTP in corso sui server Groq..."):
-            st.session_state.analysis = analyze_article(current_art['title'], current_art['content'])
+            try:
+                st.session_state.analysis = analyze_article(current_art['title'], current_art['content'])
+            except Exception as e:
+                st.error(f"Errore: {e}")
 
     if 'analysis' in st.session_state:
         analysis = st.session_state.analysis
@@ -339,6 +290,12 @@ else:
             st.markdown("#### 📝 Riassunto")
             st.info(analysis.get('riassunto', 'Nessun riassunto generato.'))
             
+            st.markdown("#### 🔍 Investigazione Tecnica")
+            for domanda in analysis.get('domande_esplorative', []):
+                if st.button(f"🔎 {domanda}", key=domanda):
+                    st.session_state.active_question = domanda
+                    st.session_state.trigger_stream = True
+                    
             st.markdown("#### 💬 Chat con l'esperto")
             with st.form(key="custom_chat_form"):
                 custom_q = st.text_input("Fai una domanda specifica su questo alert (max 200 caratteri):", max_chars=200)
@@ -346,78 +303,21 @@ else:
                 if submit_chat and custom_q:
                     st.session_state.active_question = custom_q
                     st.session_state.trigger_stream = True
-            
-            # --- SEZIONI TECNICHE DETTAGLIATE ---
-            st.markdown("#### 🎯 Vettore di Attacco")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('vettore_attacco', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("#### ⚙️ Tecnica di Exploit")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('tecnica_exploit', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("#### 📅 Timeline dell'Attacco")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('timeline_attacco', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("#### 💥 Impatto Tecnico")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('impatto_tecnico', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("#### 🛡️ Raccomandazioni di Difesa")
-            raccomandazioni = analysis.get('raccomandazioni_difesa', [])
-            if isinstance(raccomandazioni, list) and raccomandazioni:
-                for i, rec in enumerate(raccomandazioni, 1):
-                    st.markdown(f"**{i}. {rec}**")
-            else:
-                st.write("Non disponibili")
                     
         with col2:
-            st.markdown("#### 🔍 Investigazione Tecnica")
-            domande = analysis.get('domande_esplorative', [])
-            if isinstance(domande, list) and domande:
-                for domanda in domande:
-                    if st.button(f"🔎 {domanda}", key=domanda):
-                        st.session_state.active_question = domanda
-                        st.session_state.trigger_stream = True
-            else:
-                st.write("Nessuna domanda disponibile")
-            
             st.markdown("#### 🎯 Tag e TTP Rilevati")
             ttps = analysis.get('mitre_attack_ttp', [])
             if isinstance(ttps, list) and ttps:
                 for ttp in ttps:
-                    if str(ttp).strip(): 
-                        st.code(str(ttp), language="text")
+                    if str(ttp).strip(): st.code(str(ttp), language="text")
             else:
                 st.write("Nessun pattern tecnico.")
-            
-            st.markdown("#### 🔗 Indicatori di Compromissione")
-            iocs = analysis.get('indicatori_compromissione', [])
-            if isinstance(iocs, list) and iocs:
-                for ioc in iocs:
-                    if str(ioc).strip(): 
-                        st.code(str(ioc), language="text")
-            else:
-                st.write("Nessun IoC disponibile.")
 
     if st.session_state.get('trigger_stream', False):
         st.markdown("---")
         st.markdown(f"### 💡 Analisi in tempo reale: *{st.session_state.active_question}*")
         
-        context_text = f"Articolo: {current_art['title']}. Vettore: {analysis.get('vettore_attacco')}. Tecnica: {analysis.get('tecnica_exploit')}"
+        context_text = f"Articolo: {current_art['title']}. Riassunto: {analysis.get('riassunto')}"
         
         with st.chat_message("assistant", avatar="🤖"):
             full_response = st.write_stream(stream_deep_dive(context_text, st.session_state.active_question))
@@ -425,7 +325,7 @@ else:
         st.session_state.deep_dive_response = full_response
         st.session_state.trigger_stream = False
         
-    elif 'deep_dive_response' in st.session_state and st.session_state.get('active_question'):
+    elif 'deep_dive_response' in st.session_state:
         st.markdown("---")
         st.markdown(f"### 💡 Risposta: *{st.session_state.active_question}*")
         with st.chat_message("assistant", avatar="🤖"):
