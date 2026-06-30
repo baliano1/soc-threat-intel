@@ -61,37 +61,55 @@ def force_scroll_to_bottom():
     """
     components.html(js, height=0)
 
+def get_severity_indicator(title, content):
+    """Assegna un colore in base alla presenza di parole chiave nel titolo e contenuto"""
+    text = (title + " " + content).lower()
+    
+    # Parole ad alto rischio
+    high_keywords = ['ransomware', 'zero-day', '0-day', 'critical', 'exploit', 'breach', 'botnet', 'malicious', 'apt', 'hijack', 'cve-', 'rce', 'data leak', 'cyberattack', 'malware', 'trojan', 'backdoor', 'poison', 'guilty']
+    
+    # Parole a medio rischio
+    medium_keywords = ['vulnerability', 'vulnerabilità', 'phishing', 'scam', 'patch', 'update', 'aggiornamento', 'warning', 'avviso', 'flaw', 'bug', 'attack', 'attacco', 'fake', 'spoofing', 'ddos', 'fraud', 'truffa']
+    
+    if any(k in text for k in high_keywords):
+        return "🔴"
+    elif any(k in text for k in medium_keywords):
+        return "🟠"
+    else:
+        return "🟢"
+
 @st.cache_data(ttl=300)
 def fetch_rss_feeds():
+    # Rimosse le emoji statiche per fare spazio ai pallini di severità dinamici
     feeds = {
-        "🇮🇹 CSIRT Italia": "https://www.csirt.gov.it/feed/avvisi",
-        "🇮🇹 RedHotCyber": "https://www.redhotcyber.com/feed/",
-        "🇮🇹 DDay.it - Sicurezza": "https://www.dday.it/feed/categoria/sicurezza",
-        "🌐 CISA Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/all.xml",
-        "🌐 BleepingComputer": "https://www.bleepingcomputer.com/feed/",
-        "🌐 The Hacker News": "https://feeds.feedburner.com/TheHackersNews",
-        "🌐 Krebs on Security": "https://krebsonsecurity.com/feed/",
-        "🌐 Dark Reading": "https://www.darkreading.com/rss.xml",
-        "🔴 Malwarebytes Labs": "https://www.malwarebytes.com/feed/",
-        "🔴 Cisco Talos": "https://blog.talosintelligence.com/feeds/all.xml.rss",
-        "🔴 Sophos Labs": "https://www.sophos.com/en-us/press-office/press-releases.aspx",
-        "🔴 Kaspersky Lab": "https://www.kaspersky.com/blog/feed/",
-        "💀 Ransomware Advisories": "https://www.cisa.gov/sites/default/files/xml/ransomware_advisory.xml",
-        "💀 No More Ransom": "https://www.nomoreransom.org/feed/en.xml",
-        "☁️ AWS Security": "https://aws.amazon.com/security/security-updates/",
-        "☁️ Microsoft Security": "https://msrc.microsoft.com/feed",
-        "☁️ Google Security": "https://security.googleblog.com/feeds/posts/default",
-        "🏭 ICS-CERT Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/industrial-control-systems.xml",
-        "🏭 SCADA Security": "https://www.digitalbond.com/feed/",
-        "🔗 NVD (NIST)": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json",
-        "🔗 Exploit-DB": "https://www.exploit-db.com/rss.xml",
-        "📊 Mandiant Blog": "https://www.mandiant.com/resources/blog",
-        "📊 CrowdStrike Falcon": "https://www.crowdstrike.com/blog/feed/",
-        "📊 Trend Micro": "https://www.trendmicro.com/en_us/research.html",
-        "📱 Zimperium Labs": "https://blog.zimperium.com/feed/",
-        "📱 Cellebrite": "https://www.cellebrite.com/en/blog/",
-        "⚖️ GDPR.eu": "https://gdpr.eu/rss/",
-        "⚖️ Privacy Affairs": "https://www.privacyaffairs.com/feed/",
+        "CSIRT Italia": "https://www.csirt.gov.it/feed/avvisi",
+        "RedHotCyber": "https://www.redhotcyber.com/feed/",
+        "DDay.it - Sicurezza": "https://www.dday.it/feed/categoria/sicurezza",
+        "CISA Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/all.xml",
+        "BleepingComputer": "https://www.bleepingcomputer.com/feed/",
+        "The Hacker News": "https://feeds.feedburner.com/TheHackersNews",
+        "Krebs on Security": "https://krebsonsecurity.com/feed/",
+        "Dark Reading": "https://www.darkreading.com/rss.xml",
+        "Malwarebytes Labs": "https://www.malwarebytes.com/feed/",
+        "Cisco Talos": "https://blog.talosintelligence.com/feeds/all.xml.rss",
+        "Sophos Labs": "https://www.sophos.com/en-us/press-office/press-releases.aspx",
+        "Kaspersky Lab": "https://www.kaspersky.com/blog/feed/",
+        "Ransomware Advisories": "https://www.cisa.gov/sites/default/files/xml/ransomware_advisory.xml",
+        "No More Ransom": "https://www.nomoreransom.org/feed/en.xml",
+        "AWS Security": "https://aws.amazon.com/security/security-updates/",
+        "Microsoft Security": "https://msrc.microsoft.com/feed",
+        "Google Security": "https://security.googleblog.com/feeds/posts/default",
+        "ICS-CERT Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/industrial-control-systems.xml",
+        "SCADA Security": "https://www.digitalbond.com/feed/",
+        "NVD (NIST)": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json",
+        "Exploit-DB": "https://www.exploit-db.com/rss.xml",
+        "Mandiant Blog": "https://www.mandiant.com/resources/blog",
+        "CrowdStrike Falcon": "https://www.crowdstrike.com/blog/feed/",
+        "Trend Micro": "https://www.trendmicro.com/en_us/research.html",
+        "Zimperium Labs": "https://blog.zimperium.com/feed/",
+        "Cellebrite": "https://www.cellebrite.com/en/blog/",
+        "GDPR.eu": "https://gdpr.eu/rss/",
+        "Privacy Affairs": "https://www.privacyaffairs.com/feed/",
     }
     
     articles = []
@@ -101,11 +119,17 @@ def fetch_rss_feeds():
             for entry in parsed.entries[:2]:
                 raw_text = entry.get('summary', entry.get('description', entry.get('content', [{}])[0].get('value', '')))
                 if not raw_text: continue
+                
+                title = entry.get('title', 'Nessun Titolo')
+                content = clean_html(raw_text)
+                severity_emoji = get_severity_indicator(title, content)
+                
                 articles.append({
-                    "title": entry.get('title', 'Nessun Titolo'),
+                    "title": title,
                     "link": entry.get('link', ''),
-                    "content": clean_html(raw_text),
-                    "source": source_name
+                    "content": content,
+                    "source": source_name,
+                    "emoji": severity_emoji
                 })
         except Exception:
             pass 
@@ -245,7 +269,8 @@ else:
         st.divider()
         
         for a in articles:
-            if st.button(f"{a['source']}\n{a['title'][:50]}...", use_container_width=True):
+            # Qui inseriamo il pallino del rischio dinamico generato in precedenza
+            if st.button(f"{a['emoji']} {a['source']}\n{a['title'][:50]}...", use_container_width=True):
                 st.session_state.selected_article = a
                 if 'analysis' in st.session_state: del st.session_state.analysis
                 if 'deep_dive_response' in st.session_state: del st.session_state.deep_dive_response
@@ -254,7 +279,7 @@ else:
 
     current_art = st.session_state.selected_article
     st.markdown(f"### 📰 {current_art['title']}")
-    st.caption(f"**Fonte:** {current_art['source']} | [Link Ufficiale]({current_art['link']})")
+    st.caption(f"**Fonte:** {current_art['source']} | **Rischio Identificato:** {current_art['emoji']} | [Link Ufficiale]({current_art['link']})")
     
     content_preview = current_art['content'][:800] + "..." if current_art['content'] else "Testo dell'articolo non estraibile."
     st.write(content_preview)
