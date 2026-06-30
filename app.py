@@ -3,12 +3,13 @@ import feedparser
 from bs4 import BeautifulSoup
 import json
 import time
+from datetime import datetime
 from langchain_groq import ChatGroq
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
-st_autorefresh(interval=300000, limit=None, key="feed_autorefresh")
+st_autorefresh(interval=1000, limit=None, key="feed_autorefresh")
 
 # Recupero della chiave API dai segreti di Streamlit
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -211,13 +212,18 @@ else:
         # Placeholder per il contatore - verrà aggiornato
         countdown_placeholder = st.sidebar.empty()
     
-    # Inizializzazione del timer
-    if 'last_refresh_time' not in st.session_state:
-        st.session_state.last_refresh_time = time.time()
+    # Inizializzazione del timer con timestamp
+    if 'refresh_start_time' not in st.session_state:
+        st.session_state.refresh_start_time = datetime.now()
     
     # Calcolo del tempo rimanente (aggiornamento ogni 5 minuti = 300 secondi)
-    elapsed = time.time() - st.session_state.last_refresh_time
+    elapsed = (datetime.now() - st.session_state.refresh_start_time).total_seconds()
     remaining = max(0, 300 - int(elapsed))
+    
+    # Se il tempo è scaduto, ripristina il timer
+    if remaining == 0:
+        st.session_state.refresh_start_time = datetime.now()
+        remaining = 300
     
     # Aggiornamento del contatore
     with countdown_placeholder.container():
