@@ -2,117 +2,15 @@ import streamlit as st
 import feedparser
 from bs4 import BeautifulSoup
 import json
-import time
-from datetime import datetime
 from langchain_groq import ChatGroq
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
-st_autorefresh(interval=1000, limit=None, key="feed_autorefresh")
+st_autorefresh(interval=300000, limit=None, key="feed_autorefresh")
 
 # Recupero della chiave API dai segreti di Streamlit
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-
-# --- CSS PERSONALIZZATO PER ANIMAZIONE GUFETTO ---
-st.markdown("""
-<style>
-@keyframes owl_search {
-    0% { transform: translateX(0px); }
-    50% { transform: translateX(15px); }
-    100% { transform: translateX(0px); }
-}
-
-@keyframes binoculars_rotate {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-5deg); }
-    75% { transform: rotate(5deg); }
-}
-
-.owl_container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin: 15px 0;
-    animation: owl_search 2s infinite ease-in-out;
-}
-
-.owl_face {
-    font-size: 48px;
-    font-weight: bold;
-}
-
-.binoculars {
-    font-size: 36px;
-    animation: binoculars_rotate 2s infinite ease-in-out;
-    transform-origin: center;
-}
-
-.countdown_box {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 12px;
-    border-radius: 8px;
-    text-align: center;
-    margin: 10px 0;
-    font-weight: bold;
-    font-size: 16px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.countdown_label {
-    font-size: 12px;
-    opacity: 0.9;
-    margin-bottom: 5px;
-}
-
-.countdown_time {
-    font-size: 24px;
-    font-family: 'Courier New', monospace;
-}
-
-.pulse_indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #10b981;
-    margin-left: 8px;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-}
-
-.helper_text {
-    font-size: 14px;
-    font-weight: 500;
-    color: #666;
-    margin: 10px 0;
-    padding: 5px 0;
-}
-
-.technical_section {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-    padding: 15px;
-    border-radius: 8px;
-    margin: 10px 0;
-    border-left: 4px solid #ff6b6b;
-}
-
-.technical_subsection {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 12px;
-    border-radius: 6px;
-    margin: 8px 0;
-    border-left: 3px solid #ffd93d;
-}
-</style>
-""", unsafe_allow_html=True)
 
 def clean_html(raw_html):
     if not raw_html: return ""
@@ -121,60 +19,17 @@ def clean_html(raw_html):
 @st.cache_data(ttl=300)
 def fetch_rss_feeds():
     feeds = {
-        # --- FONTI ITALIANE ---
         "🇮🇹 CSIRT Italia": "https://www.csirt.gov.it/feed/avvisi",
         "🇮🇹 RedHotCyber": "https://www.redhotcyber.com/feed/",
-        "🇮🇹 DDay.it - Sicurezza": "https://www.dday.it/feed/categoria/sicurezza",
-        
-        # --- FONTI GLOBALI - ADVISORY E VULNERABILITÀ ---
-        "🌐 CISA Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/all.xml",
         "🌐 BleepingComputer": "https://www.bleepingcomputer.com/feed/",
         "🌐 The Hacker News": "https://feeds.feedburner.com/TheHackersNews",
-        "🌐 Krebs on Security": "https://krebsonsecurity.com/feed/",
-        "🌐 Dark Reading": "https://www.darkreading.com/rss.xml",
-        
-        # --- FONTI SPECIALIZZATE - MALWARE E THREAT INTEL ---
-        "🔴 Malwarebytes Labs": "https://www.malwarebytes.com/feed/",
-        "🔴 Cisco Talos": "https://blog.talosintelligence.com/feeds/all.xml.rss",
-        "🔴 Sophos Labs": "https://www.sophos.com/en-us/press-office/press-releases.aspx",
-        "🔴 Kaspersky Lab": "https://www.kaspersky.com/blog/feed/",
-        
-        # --- FONTI SPECIALIZZATE - RANSOMWARE ---
-        "💀 Ransomware Advisories": "https://www.cisa.gov/sites/default/files/xml/ransomware_advisory.xml",
-        "💀 No More Ransom": "https://www.nomoreransom.org/feed/en.xml",
-        
-        # --- FONTI SPECIALIZZATE - CLOUD & INFRASTRUCTURE ---
-        "☁️ AWS Security": "https://aws.amazon.com/security/security-updates/",
-        "☁️ Microsoft Security": "https://msrc.microsoft.com/feed",
-        "☁️ Google Security": "https://security.googleblog.com/feeds/posts/default",
-        
-        # --- FONTI SPECIALIZZATE - IoT E OT ---
-        "🏭 ICS-CERT Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/industrial-control-systems.xml",
-        "🏭 SCADA Security": "https://www.digitalbond.com/feed/",
-        
-        # --- FONTI SPECIALIZZATE - API & APPLICAZIONI ---
-        "🔗 NVD (NIST)": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json",
-        "🔗 Exploit-DB": "https://www.exploit-db.com/rss.xml",
-        
-        # --- FONTI SPECIALIZZATE - REPORT E ANALISI ---
-        "📊 Mandiant Blog": "https://www.mandiant.com/resources/blog",
-        "📊 CrowdStrike Falcon": "https://www.crowdstrike.com/blog/feed/",
-        "📊 Trend Micro": "https://www.trendmicro.com/en_us/research.html",
-        
-        # --- FONTI SPECIALIZZATE - SICUREZZA MOBILE ---
-        "📱 Zimperium Labs": "https://blog.zimperium.com/feed/",
-        "📱 Cellebrite": "https://www.cellebrite.com/en/blog/",
-        
-        # --- FONTI SPECIALIZZATE - PRIVACY E COMPLIANCE ---
-        "⚖️ GDPR.eu": "https://gdpr.eu/rss/",
-        "⚖️ Privacy Affairs": "https://www.privacyaffairs.com/feed/",
+        "🌐 CISA Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/all.xml"
     }
-    
     articles = []
     for source_name, url in feeds.items():
         try:
             parsed = feedparser.parse(url)
-            for entry in parsed.entries[:2]:
+            for entry in parsed.entries[:3]: 
                 raw_text = entry.get('summary', entry.get('description', entry.get('content', [{}])[0].get('value', '')))
                 articles.append({
                     "title": entry.get('title', 'Nessun Titolo'),
