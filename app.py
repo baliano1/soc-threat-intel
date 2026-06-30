@@ -131,7 +131,7 @@ def fetch_rss_feeds():
         "🌐 BleepingComputer": "https://www.bleepingcomputer.com/feed/",
         "🌐 The Hacker News": "https://feeds.feedburner.com/TheHackersNews",
         "🌐 Krebs on Security": "https://krebsonsecurity.com/feed/",
-        "🌐 Darkside Hackers": "https://www.darkreading.com/threat-intelligence/feed",
+        "🌐 Dark Reading": "https://www.darkreading.com/rss.xml",
         
         # --- FONTI SPECIALIZZATE - MALWARE E THREAT INTEL ---
         "🔴 Malwarebytes Labs": "https://www.malwarebytes.com/feed/",
@@ -174,7 +174,7 @@ def fetch_rss_feeds():
     for source_name, url in feeds.items():
         try:
             parsed = feedparser.parse(url)
-            for entry in parsed.entries[:2]:  # Ridotto a 2 per non sovraccaricare
+            for entry in parsed.entries[:2]:
                 raw_text = entry.get('summary', entry.get('description', entry.get('content', [{}])[0].get('value', '')))
                 articles.append({
                     "title": entry.get('title', 'Nessun Titolo'),
@@ -187,7 +187,7 @@ def fetch_rss_feeds():
     return articles
 
 def analyze_article(title, content):
-    # Inizializziamo Groq in modalità JSON per forzare l'output corretto
+    """Analizza l'articolo usando Groq con focus su dettagli dell'attacco"""
     llm = ChatGroq(
         temperature=0, 
         model_name="llama-3.1-8b-instant", 
@@ -195,67 +195,97 @@ def analyze_article(title, content):
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
-    prompt = f"""
-    Genera ESCLUSIVAMENTE un oggetto JSON valido. RISPONDI RIGOROSAMENTE IN ITALIANO.
-    Usa ESATTAMENTE queste chiavi, rigorosamente in minuscolo:
-    "riassunto", "vettore_attacco", "tecnica_exploit", "timeline_attacco", 
-    "indicatori_compromissione", "impatto_tecnico", "mitre_attack_ttp", "raccomandazioni_difesa"
-    
-    IMPORTANTE: Spiega DETTAGLIATAMENTE come gli attaccanti hanno eseguito l'attacco, step-by-step.
-    
-    Struttura JSON richiesta:
-    {{
-        "riassunto": "Riassunto di 3-4 frasi: chi è stato attaccato, quando, che tipo di attacco.",
-        "vettore_attacco": "Come gli attaccanti hanno ottenuto accesso iniziale al sistema? (es: phishing, exploit di vulnerabilità, accesso non autorizzato a servizi esposti, credential stuffing, etc.)",
-        "tecnica_exploit": "Quali tecniche specifiche sono state utilizzate? (es: sfruttamento di CVE-XXXX-XXXXX, uso di malware specifico, SQL injection, RCE, privilege escalation, etc.)",
-        "timeline_attacco": "Sequenza temporale cronologica dell'attacco: 1) Accesso iniziale, 2) Movimento laterale, 3) Esfiltrazione dati, 4) Danno causato",
-        "indicatori_compromissione": ["IoC specifici: indirizzi IP, domini, hash malware, nomi file sospetti, porte utilizzate, etc."],
-        "impatto_tecnico": "Cosa è stato effettivamente compromesso? Quali dati sono stati esfiltrati? Quanti record? Come sono stati rubati? Quale danno è stato causato ai sistemi?",
-        "mitre_attack_ttp": ["T1234 - Tecnica MITRE", "T5678 - Altra Tecnica"],
-        "raccomandazioni_difesa": ["Raccomandazione 1: azione concreta per prevenire", "Raccomandazione 2: azione di detection", "Raccomandazione 3: azione di contenimento"]
-    }}
-    
-    Titolo: {title}
-    Testo: {content[:2000]} 
-    """
-    
-    # In LangChain i ChatModels restituiscono un oggetto con .content
-    response = llm.invoke(prompt)
+    prompt = f"""Sei un analista di sicurezza informatica. Analizza il seguente alert di sicurezza e genera un JSON valido con queste chiavi esatte (tutte minuscole):
+
+riassunto, vettore_attacco, tecnica_exploit, timeline_attacco, indicatori_compromissione, impatto_tecnico, mitre_attack_ttp, raccomandazioni_difesa, domande_esplorative
+
+REGOLE FONDAMENTALI:
+1. Genera SOLO un JSON valido, niente altro
+2. Rispondi rigorosamente in ITALIANO
+3. Per vettore_attacco: spiega come gli attaccanti hanno ottenuto accesso iniziale (phishing, exploit, credenziali, etc)
+4. Per tecnica_exploit: dettagli tecnici specifici (CVE, malware, tecniche di sfruttamento)
+5. Per timeline_attacco: sequenza cronologica step-by-step dell'intera catena d'attacco
+6. Per indicatori_compromissione: lista di IoC (IP, domini, hash, file, porte)
+7. Per impatto_tecnico: cosa è stato compromesso, dati rubati, danno ai sistemi
+8. Per mitre_attack_ttp: codici MITRE Attack (es: T1234 - Nome Tecnica)
+9. Per raccomandazioni_difesa: azioni concrete di prevenzione, detection e risposta
+10. Per domande_esplorative: 3 domande tecniche pertinenti all'attacco
+
+Titolo: {title}
+
+Contenuto: {content[:2000]}
+
+Genera il JSON con esattamente queste chiavi:
+{{
+  "riassunto": "Breve riassunto 2-3 frasi",
+  "vettore_attacco": "Come hanno ottenuto accesso iniziale",
+  "tecnica_exploit": "Tecniche specifiche utilizzate",
+  "timeline_attacco": "Sequenza chronologica dell'attacco",
+  "indicatori_compromissione": ["IoC1", "IoC2", "IoC3"],
+  "impatto_tecnico": "Cosa è stato compromesso e come",
+  "mitre_attack_ttp": ["T1234 - Tecnica1", "T5678 - Tecnica2"],
+  "raccomandazioni_difesa": ["Azione1", "Azione2", "Azione3"],
+  "domande_esplorative": ["Domanda1?", "Domanda2?", "Domanda3?"]
+}}
+"""
     
     try:
+        response = llm.invoke(prompt)
         raw_json = json.loads(response.content)
+        
+        # Normalizza le chiavi
         clean_json = {str(k).lower(): v for k, v in raw_json.items()}
         
-        for key in ["risposta", "response", "analisi", "json", "output"]:
-            if key in clean_json and isinstance(clean_json[key], dict):
-                clean_json = {str(k).lower(): v for k, v in clean_json[key].items()}
-                break
-                
+        # Verifica che tutte le chiavi essenziali siano presenti
+        required_keys = [
+            "riassunto", "vettore_attacco", "tecnica_exploit", "timeline_attacco",
+            "indicatori_compromissione", "impatto_tecnico", "mitre_attack_ttp",
+            "raccomandazioni_difesa", "domande_esplorative"
+        ]
+        
+        for key in required_keys:
+            if key not in clean_json:
+                clean_json[key] = "Non disponibile"
+        
         return clean_json
         
-    except Exception as e:
+    except json.JSONDecodeError as e:
+        st.error(f"Errore nel parsing JSON: {str(e)}")
         return {
-            "riassunto": "Errore di conversione JSON. Riprova l'analisi.",
+            "riassunto": "Errore nell'analisi. Riprova.",
             "vettore_attacco": "Non disponibile",
             "tecnica_exploit": "Non disponibile",
             "timeline_attacco": "Non disponibile",
             "indicatori_compromissione": [],
             "impatto_tecnico": "Non disponibile",
             "mitre_attack_ttp": [],
-            "raccomandazioni_difesa": []
+            "raccomandazioni_difesa": [],
+            "domande_esplorative": []
+        }
+    except Exception as e:
+        st.error(f"Errore durante l'analisi: {str(e)}")
+        return {
+            "riassunto": "Errore nell'analisi. Riprova.",
+            "vettore_attacco": "Non disponibile",
+            "tecnica_exploit": "Non disponibile",
+            "timeline_attacco": "Non disponibile",
+            "indicatori_compromissione": [],
+            "impatto_tecnico": "Non disponibile",
+            "mitre_attack_ttp": [],
+            "raccomandazioni_difesa": [],
+            "domande_esplorative": []
         }
 
 def stream_deep_dive(context, question):
+    """Chat esperto con streaming"""
     llm = ChatGroq(temperature=0.3, model_name="llama-3.1-8b-instant", groq_api_key=GROQ_API_KEY)
-    prompt = f"""
-    Sei un Senior Security Engineer. RISPONDI RIGOROSAMENTE IN ITALIANO, in modo tecnico e professionale. 
-    Contesto: {context}
-    Domanda dell'utente: {question}
+    prompt = f"""Sei un Senior Security Engineer. RISPONDI RIGOROSAMENTE IN ITALIANO, in modo tecnico e professionale.
+Contesto: {context}
+Domanda dell'utente: {question}
+
+Sii specifico e pratico. Se la domanda riguarda come funziona un attacco, spiega step-by-step.
+Se la domanda riguarda mitigazione, fornisci azioni concrete."""
     
-    Sii specifico e pratico. Se la domanda riguarda come funziona un attacco, spiega step-by-step.
-    Se la domanda riguarda mitigazione, fornisci azioni concrete che un team SOC può implementare.
-    """
-    # Adattiamo lo streaming per Streamlit e ChatGroq
     for chunk in llm.stream(prompt):
         yield chunk.content
 
@@ -290,23 +320,19 @@ else:
         """, unsafe_allow_html=True)
     
     with col2:
-        # Placeholder per il contatore - verrà aggiornato
         countdown_placeholder = st.sidebar.empty()
     
-    # Inizializzazione del timer con timestamp
+    # Inizializzazione del timer
     if 'refresh_start_time' not in st.session_state:
         st.session_state.refresh_start_time = datetime.now()
     
-    # Calcolo del tempo rimanente (aggiornamento ogni 5 minuti = 300 secondi)
     elapsed = (datetime.now() - st.session_state.refresh_start_time).total_seconds()
     remaining = max(0, 300 - int(elapsed))
     
-    # Se il tempo è scaduto, ripristina il timer
     if remaining == 0:
         st.session_state.refresh_start_time = datetime.now()
         remaining = 300
     
-    # Aggiornamento del contatore
     with countdown_placeholder.container():
         st.markdown(f"""
         <div class="countdown_box">
@@ -316,19 +342,19 @@ else:
         """, unsafe_allow_html=True)
     
     st.sidebar.caption("Si aggiorna automaticamente ogni 5 minuti.")
-    
-    # --- ETICHETTA HELPER PER UTENTI MOBILE ---
     st.sidebar.markdown('<div class="helper_text">👇 Scegli un bollettino da consultare</div>', unsafe_allow_html=True)
-    
     st.sidebar.divider()
     
     for a in articles:
         btn_label = f"{a['source']}\n{a['title'][:50]}..."
         if st.sidebar.button(btn_label, use_container_width=True):
             st.session_state.selected_article = a
-            if 'analysis' in st.session_state: del st.session_state.analysis
-            if 'deep_dive_response' in st.session_state: del st.session_state.deep_dive_response
-            if 'trigger_stream' in st.session_state: del st.session_state.trigger_stream
+            if 'analysis' in st.session_state: 
+                del st.session_state.analysis
+            if 'deep_dive_response' in st.session_state: 
+                del st.session_state.deep_dive_response
+            if 'trigger_stream' in st.session_state: 
+                del st.session_state.trigger_stream
 
     current_art = st.session_state.selected_article
     st.markdown(f"### 📰 {current_art['title']}")
@@ -337,10 +363,7 @@ else:
 
     if st.button("🚀 Avvia Analisi AI Cloud", type="primary"):
         with st.spinner("Estrazione TTP in corso sui server Groq..."):
-            try:
-                st.session_state.analysis = analyze_article(current_art['title'], current_art['content'])
-            except Exception as e:
-                st.error(f"Errore: {e}")
+            st.session_state.analysis = analyze_article(current_art['title'], current_art['content'])
 
     if 'analysis' in st.session_state:
         analysis = st.session_state.analysis
@@ -398,16 +421,21 @@ else:
                     
         with col2:
             st.markdown("#### 🔍 Investigazione Tecnica")
-            for domanda in analysis.get('domande_esplorative', []):
-                if st.button(f"🔎 {domanda}", key=domanda):
-                    st.session_state.active_question = domanda
-                    st.session_state.trigger_stream = True
+            domande = analysis.get('domande_esplorative', [])
+            if isinstance(domande, list) and domande:
+                for domanda in domande:
+                    if st.button(f"🔎 {domanda}", key=domanda):
+                        st.session_state.active_question = domanda
+                        st.session_state.trigger_stream = True
+            else:
+                st.write("Nessuna domanda disponibile")
             
             st.markdown("#### 🎯 Tag e TTP Rilevati")
             ttps = analysis.get('mitre_attack_ttp', [])
             if isinstance(ttps, list) and ttps:
                 for ttp in ttps:
-                    if str(ttp).strip(): st.code(str(ttp), language="text")
+                    if str(ttp).strip(): 
+                        st.code(str(ttp), language="text")
             else:
                 st.write("Nessun pattern tecnico.")
             
@@ -415,7 +443,8 @@ else:
             iocs = analysis.get('indicatori_compromissione', [])
             if isinstance(iocs, list) and iocs:
                 for ioc in iocs:
-                    if str(ioc).strip(): st.code(str(ioc), language="text")
+                    if str(ioc).strip(): 
+                        st.code(str(ioc), language="text")
             else:
                 st.write("Nessun IoC disponibile.")
 
@@ -423,7 +452,7 @@ else:
         st.markdown("---")
         st.markdown(f"### 💡 Analisi in tempo reale: *{st.session_state.active_question}*")
         
-        context_text = f"Articolo: {current_art['title']}. Riassunto: {analysis.get('riassunto')}. Vettore: {analysis.get('vettore_attacco')}. Tecnica: {analysis.get('tecnica_exploit')}"
+        context_text = f"Articolo: {current_art['title']}. Vettore: {analysis.get('vettore_attacco')}. Tecnica: {analysis.get('tecnica_exploit')}"
         
         with st.chat_message("assistant", avatar="🤖"):
             full_response = st.write_stream(stream_deep_dive(context_text, st.session_state.active_question))
@@ -431,7 +460,7 @@ else:
         st.session_state.deep_dive_response = full_response
         st.session_state.trigger_stream = False
         
-    elif 'deep_dive_response' in st.session_state:
+    elif 'deep_dive_response' in st.session_state and st.session_state.get('active_question'):
         st.markdown("---")
         st.markdown(f"### 💡 Risposta: *{st.session_state.active_question}*")
         with st.chat_message("assistant", avatar="🤖"):
