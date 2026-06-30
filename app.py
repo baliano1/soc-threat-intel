@@ -186,17 +186,6 @@ def fetch_rss_feeds():
             pass 
     return articles
 
-def extract_json_from_response(response_text):
-    """Estrae JSON valido dalla risposta, rimuovendo markdown code blocks"""
-    # Rimuove markdown code blocks (```json ... ```)
-    if "```" in response_text:
-        start = response_text.find("{")
-        end = response_text.rfind("}") + 1
-        if start != -1 and end > start:
-            response_text = response_text[start:end]
-    
-    return response_text.strip()
-
 def analyze_article(title, content):
     """Analizza l'articolo usando Groq con focus su dettagli dell'attacco"""
     llm = ChatGroq(
@@ -205,27 +194,6 @@ def analyze_article(title, content):
         groq_api_key=GROQ_API_KEY,
         model_kwargs={"response_format": {"type": "json_object"}}
     )
-    
-    prompt = f"""Sei un analista di sicurezza informatica. Analizza il seguente alert di sicurezza e genera un JSON valido.
-
-GENERA SOLO IL JSON, SENZA MARKDOWN, SENZA SPIEGAZIONI.
-
-Chiavi richieste (tutte minuscole):
-- riassunto: breve riassunto 2-3 frasi
-- vettore_attacco: come gli attaccanti hanno ottenuto accesso iniziale
-- tecnica_exploit: tecniche specifiche utilizzate (CVE, malware)
-- timeline_attacco: sequenza cronologica step-by-step
-- indicatori_compromissione: lista di IoC (IP, domini, hash)
-- impatto_tecnico: cosa è stato compromesso e come
-- mitre_attack_ttp: array di codici MITRE (T1234 - Nome)
-- raccomandazioni_difesa: array di azioni di prevenzione
-- domande_esplorative: array di 3 domande tecniche
-
-Titolo: {title}
-Contenuto: {content[:2000]}
-
-RISPONDI SOLO CON JSON VALIDO:
-"""
     
     try:
         response = llm.invoke(prompt)
