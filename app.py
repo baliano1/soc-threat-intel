@@ -86,6 +86,14 @@ st.markdown("""
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
+
+.helper_text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #666;
+    margin: 10px 0;
+    padding: 5px 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -96,17 +104,60 @@ def clean_html(raw_html):
 @st.cache_data(ttl=300)
 def fetch_rss_feeds():
     feeds = {
+        # --- FONTI ITALIANE ---
         "🇮🇹 CSIRT Italia": "https://www.csirt.gov.it/feed/avvisi",
         "🇮🇹 RedHotCyber": "https://www.redhotcyber.com/feed/",
+        "🇮🇹 DDay.it - Sicurezza": "https://www.dday.it/feed/categoria/sicurezza",
+        
+        # --- FONTI GLOBALI - ADVISORY E VULNERABILITÀ ---
+        "🌐 CISA Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/all.xml",
         "🌐 BleepingComputer": "https://www.bleepingcomputer.com/feed/",
         "🌐 The Hacker News": "https://feeds.feedburner.com/TheHackersNews",
-        "🌐 CISA Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/all.xml"
+        "🌐 Krebs on Security": "https://krebsonsecurity.com/feed/",
+        "🌐 Darkside Hackers": "https://www.darkreading.com/threat-intelligence/feed",
+        
+        # --- FONTI SPECIALIZZATE - MALWARE E THREAT INTEL ---
+        "🔴 Malwarebytes Labs": "https://www.malwarebytes.com/feed/",
+        "🔴 Cisco Talos": "https://blog.talosintelligence.com/feeds/all.xml.rss",
+        "🔴 Sophos Labs": "https://www.sophos.com/en-us/press-office/press-releases.aspx",
+        "🔴 Kaspersky Lab": "https://www.kaspersky.com/blog/feed/",
+        
+        # --- FONTI SPECIALIZZATE - RANSOMWARE ---
+        "💀 Ransomware Advisories": "https://www.cisa.gov/sites/default/files/xml/ransomware_advisory.xml",
+        "💀 No More Ransom": "https://www.nomoreransom.org/feed/en.xml",
+        
+        # --- FONTI SPECIALIZZATE - CLOUD & INFRASTRUCTURE ---
+        "☁️ AWS Security": "https://aws.amazon.com/security/security-updates/",
+        "☁️ Microsoft Security": "https://msrc.microsoft.com/feed",
+        "☁️ Google Security": "https://security.googleblog.com/feeds/posts/default",
+        
+        # --- FONTI SPECIALIZZATE - IoT E OT ---
+        "🏭 ICS-CERT Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/industrial-control-systems.xml",
+        "🏭 SCADA Security": "https://www.digitalbond.com/feed/",
+        
+        # --- FONTI SPECIALIZZATE - API & APPLICAZIONI ---
+        "🔗 NVD (NIST)": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json",
+        "🔗 Exploit-DB": "https://www.exploit-db.com/rss.xml",
+        
+        # --- FONTI SPECIALIZZATE - REPORT E ANALISI ---
+        "📊 Mandiant Blog": "https://www.mandiant.com/resources/blog",
+        "📊 CrowdStrike Falcon": "https://www.crowdstrike.com/blog/feed/",
+        "📊 Trend Micro": "https://www.trendmicro.com/en_us/research.html",
+        
+        # --- FONTI SPECIALIZZATE - SICUREZZA MOBILE ---
+        "📱 Zimperium Labs": "https://blog.zimperium.com/feed/",
+        "📱 Cellebrite": "https://www.cellebrite.com/en/blog/",
+        
+        # --- FONTI SPECIALIZZATE - PRIVACY E COMPLIANCE ---
+        "⚖️ GDPR.eu": "https://gdpr.eu/rss/",
+        "⚖️ Privacy Affairs": "https://www.privacyaffairs.com/feed/",
     }
+    
     articles = []
     for source_name, url in feeds.items():
         try:
             parsed = feedparser.parse(url)
-            for entry in parsed.entries[:3]: 
+            for entry in parsed.entries[:2]:  # Ridotto a 2 per non sovraccaricare
                 raw_text = entry.get('summary', entry.get('description', entry.get('content', [{}])[0].get('value', '')))
                 articles.append({
                     "title": entry.get('title', 'Nessun Titolo'),
@@ -235,6 +286,10 @@ else:
         """, unsafe_allow_html=True)
     
     st.sidebar.caption("Si aggiorna automaticamente ogni 5 minuti.")
+    
+    # --- ETICHETTA HELPER PER UTENTI MOBILE ---
+    st.sidebar.markdown('<div class="helper_text">👇 Scegli un bollettino da consultare</div>', unsafe_allow_html=True)
+    
     st.sidebar.divider()
     
     for a in articles:
