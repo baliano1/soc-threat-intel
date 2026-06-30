@@ -7,6 +7,19 @@ import re
 from langchain_groq import ChatGroq
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components
+import streamlit as block
+
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 0rem !important;
+            padding-bottom: 0rem !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
@@ -151,8 +164,7 @@ def stream_deep_dive(context, question):
         yield chunk.content
 
 # --- INTERFACCIA UTENTE ---
-st.markdown("<h1 style='text-align: center;'>🛡️ SOC Threat Intelligence Explorer</h1>", unsafe_allow_html=True)
-
+st.markdown("<h1 style='text-align: center; margin-top: 0px;'>🛡️ SOC Threat Intelligence Explorer</h1>
 
 with st.spinner("Sincronizzazione Feed RSS in corso..."):
     articles = fetch_rss_feeds()
