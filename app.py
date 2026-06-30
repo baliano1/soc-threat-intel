@@ -7,13 +7,16 @@ import re
 from langchain_groq import ChatGroq
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components
-import streamlit as block
 
+# --- 1. CONFIGURAZIONE PAGINA (DEVE ESSERE IL PRIMO COMANDO) ---
+st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
+
+# --- 2. CSS PER RIMUOVERE IL MARGINE SUPERIORE ---
 st.markdown(
     """
     <style>
         .block-container {
-            padding-top: 0rem !important;
+            padding-top: 1rem !important;
             padding-bottom: 0rem !important;
         }
     </style>
@@ -21,8 +24,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
 st_autorefresh(interval=300000, limit=None, key="feed_autorefresh")
 
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -122,7 +123,7 @@ def analyze_article(title, content):
         "impatto_tecnico": "Testo descrittivo...",
         "anatomia_attacco": "Testo formattato in Markdown con blocchi di codice per mostrare script/payload realistici...",
         "mitre_attack_ttp": ["TTP1", "TTP2"], qualora non trovassi informazioni coerenti con un codice MITRE&ATTACK (es. T1566) inserisci "Dato non trovato/non disponibile", 
-        "indicatori_compromissione": ["IoC1", "IoC2"],qualora non trovassi informazioni coenti con un IOC (IP segnalati, Hash, CVE ecc) inserisci "Dato non trovato/non disponibile",
+        "indicatori_compromissione": ["IoC1", "IoC2"],qualora non trovassi informazioni coerenti con un IOC (IP segnalati, Hash, CVE ecc) inserisci "Dato non trovato/non disponibile",
         "raccomandazioni_difesa": ["Azione 1", "Azione 2"],
         "domande_esplorative": ["Domanda 1", "Domanda 2"],
         "timeline_attacco": [
@@ -164,6 +165,7 @@ def stream_deep_dive(context, question):
         yield chunk.content
 
 # --- INTERFACCIA UTENTE ---
+# Titolo centrato e senza margini superiori extra
 st.markdown("<h1 style='text-align: center; margin-top: 0px;'>🛡️ SOC Threat Intelligence Explorer</h1>", unsafe_allow_html=True)
 
 with st.spinner("Sincronizzazione Feed RSS in corso..."):
@@ -251,7 +253,6 @@ else:
             with st.expander("🔬 ANATOMIA DELL'ATTACCO E SIMULAZIONE", expanded=True):
                 st.markdown(a.get('anatomia_attacco'))
                 
-            # --- TIMELINE VISUALE CORRETTA (Senza spazi iniziali per evitare formattazione Markdown code block) ---
             with st.expander("⏱️ TIMELINE DELL'ATTACCO", expanded=True):
                 timeline_data = a.get('timeline_attacco', [])
                 if isinstance(timeline_data, list) and len(timeline_data) > 0:
@@ -259,7 +260,6 @@ else:
                     for step in timeline_data:
                         fase = step.get('fase', 'Fase')
                         desc = step.get('descrizione', '')
-                        # Evitiamo accuratamente le indentazioni qui dentro!
                         html_timeline += f'<div style="position: relative; margin-bottom: 20px;">\n'
                         html_timeline += f'<span style="position: absolute; left: -31px; top: 2px; background-color: #ff4b4b; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #1e1e1e;"></span>\n'
                         html_timeline += f'<h5 style="margin:0; color: #ff4b4b;">{fase}</h5>\n'
