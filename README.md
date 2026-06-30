@@ -1,4 +1,4 @@
-🛡️ SOC Threat Intelligence Explorer
+#🛡️ SOC Threat Intelligence Explorer
 La dashboard definitiva per analizzare le minacce cyber in tempo reale. Questo strumento aggrega automaticamente i feed RSS dai principali centri di ricerca sulla sicurezza e utilizza l'intelligenza artificiale per trasformare bollettini complessi in report analitici comprensibili e azionabili.
 🚀 Cosa puoi fare con questo tool
 Monitoraggio Live: Aggiornamento automatico dei feed RSS ogni 5 minuti.
