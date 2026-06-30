@@ -97,20 +97,22 @@ st.markdown("""
 }
 
 .technical_section {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
     color: white;
     padding: 15px;
     border-radius: 8px;
     margin: 10px 0;
-    border-left: 4px solid #ff6b6b;
+    border-left: 4px solid #1abc9c;
 }
 
-.technical_subsection {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 12px;
-    border-radius: 6px;
-    margin: 8px 0;
-    border-left: 3px solid #ffd93d;
+.anatomy_section {
+    background: #1e1e1e;
+    color: #f8f8f2;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 15px 0;
+    border-left: 4px solid #ff5555;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -130,53 +132,14 @@ def extract_json_from_response(text):
 @st.cache_data(ttl=300)
 def fetch_rss_feeds():
     feeds = {
-        # --- FONTI ITALIANE ---
         "🇮🇹 CSIRT Italia": "https://www.csirt.gov.it/feed/avvisi",
         "🇮🇹 RedHotCyber": "https://www.redhotcyber.com/feed/",
         "🇮🇹 DDay.it - Sicurezza": "https://www.dday.it/feed/categoria/sicurezza",
-        
-        # --- FONTI GLOBALI - ADVISORY E VULNERABILITÀ ---
         "🌐 CISA Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/all.xml",
         "🌐 BleepingComputer": "https://www.bleepingcomputer.com/feed/",
         "🌐 The Hacker News": "https://feeds.feedburner.com/TheHackersNews",
         "🌐 Krebs on Security": "https://krebsonsecurity.com/feed/",
         "🌐 Dark Reading": "https://www.darkreading.com/rss.xml",
-        
-        # --- FONTI SPECIALIZZATE - MALWARE E THREAT INTEL ---
-        "🔴 Malwarebytes Labs": "https://www.malwarebytes.com/feed/",
-        "🔴 Cisco Talos": "https://blog.talosintelligence.com/feeds/all.xml.rss",
-        "🔴 Sophos Labs": "https://www.sophos.com/en-us/press-office/press-releases.aspx",
-        "🔴 Kaspersky Lab": "https://www.kaspersky.com/blog/feed/",
-        
-        # --- FONTI SPECIALIZZATE - RANSOMWARE ---
-        "💀 Ransomware Advisories": "https://www.cisa.gov/sites/default/files/xml/ransomware_advisory.xml",
-        "💀 No More Ransom": "https://www.nomoreransom.org/feed/en.xml",
-        
-        # --- FONTI SPECIALIZZATE - CLOUD & INFRASTRUCTURE ---
-        "☁️ AWS Security": "https://aws.amazon.com/security/security-updates/",
-        "☁️ Microsoft Security": "https://msrc.microsoft.com/feed",
-        "☁️ Google Security": "https://security.googleblog.com/feeds/posts/default",
-        
-        # --- FONTI SPECIALIZZATE - IoT E OT ---
-        "🏭 ICS-CERT Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/industrial-control-systems.xml",
-        "🏭 SCADA Security": "https://www.digitalbond.com/feed/",
-        
-        # --- FONTI SPECIALIZZATE - API & APPLICAZIONI ---
-        "🔗 NVD (NIST)": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json",
-        "🔗 Exploit-DB": "https://www.exploit-db.com/rss.xml",
-        
-        # --- FONTI SPECIALIZZATE - REPORT E ANALISI ---
-        "📊 Mandiant Blog": "https://www.mandiant.com/resources/blog",
-        "📊 CrowdStrike Falcon": "https://www.crowdstrike.com/blog/feed/",
-        "📊 Trend Micro": "https://www.trendmicro.com/en_us/research.html",
-        
-        # --- FONTI SPECIALIZZATE - SICUREZZA MOBILE ---
-        "📱 Zimperium Labs": "https://blog.zimperium.com/feed/",
-        "📱 Cellebrite": "https://www.cellebrite.com/en/blog/",
-        
-        # --- FONTI SPECIALIZZATE - PRIVACY E COMPLIANCE ---
-        "⚖️ GDPR.eu": "https://gdpr.eu/rss/",
-        "⚖️ Privacy Affairs": "https://www.privacyaffairs.com/feed/",
     }
     
     articles = []
@@ -204,35 +167,40 @@ def analyze_article(title, content):
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
-    # --- DEFINIZIONE DEL PROMPT ---
     prompt = f"""
-    Analizza questo articolo di cybersecurity e rispondi ESCLUSIVAMENTE con un oggetto JSON valido.
-    Chiavi obbligatorie (tutte in minuscolo): "riassunto", "vettore_attacco", "tecnica_exploit", "timeline_attacco", "indicatori_compromissione", "impatto_tecnico", "mitre_attack_ttp", "raccomandazioni_difesa", "domande_esplorative".
+    Analizza questo articolo di cybersecurity e rispondi ESCLUSIVAMENTE con un oggetto JSON valido in lingua italiana.
+    Non inserire introduzioni o considerazioni fuori dal JSON.
+
+    Chiavi obbligatorie (tutte in minuscolo): 
+    "riassunto", "vettore_attacco", "tecnica_exploit", "timeline_attacco", "indicatori_compromissione", "impatto_tecnico", "mitre_attack_ttp", "raccomandazioni_difesa", "domande_esplorative", "anatomia_attacco".
     
+    Specifiche per la chiave "anatomia_attacco":
+    Spiega dettagliatamente passo dopo passo come si sviluppa questa catena di attacco. 
+    IMPORTANTE: Se il testo del bollettino non descrive precisamente i dettagli tecnici del payload o dei comandi, inventa tu uno scenario di esempio realistico con variabili fittizie (es. un blocco di codice exploit di esempio, comandi PowerShell/Bash simulati, o tabelle con i passaggi dell'attaccante) usando formattazione Markdown strutturata per mostrare graficamente la dinamica tecnica.
+
     Articolo: {title}
     Testo: {content[:1500]}
     """
     
     try:
         response = llm.invoke(prompt)
-        # Estrae il JSON dalla risposta
         json_text = extract_json_from_response(response.content)
         raw_json = json.loads(json_text)
         
-        # Normalizza le chiavi
         clean_json = {str(k).lower(): v for k, v in raw_json.items()}
         
-        # Verifica che tutte le chiavi essenziali siano presenti
         required_keys = [
             "riassunto", "vettore_attacco", "tecnica_exploit", "timeline_attacco",
             "indicatori_compromissione", "impatto_tecnico", "mitre_attack_ttp",
-            "raccomandazioni_difesa", "domande_esplorative"
+            "raccomandazioni_difesa", "domande_esplorative", "anatomia_attacco"
         ]
         
         for key in required_keys:
             if key not in clean_json:
                 if key in ["indicatori_compromissione", "mitre_attack_ttp", "raccomandazioni_difesa", "domande_esplorative"]:
                     clean_json[key] = []
+                elif key == "anatomia_attacco":
+                    clean_json[key] = "Dettagli anatomia attacco non generati."
                 else:
                     clean_json[key] = "Non disponibile"
         
@@ -246,7 +214,6 @@ def analyze_article(title, content):
         return get_fallback_analysis()
 
 def get_fallback_analysis():
-    """Ritorna un'analisi di fallback quando c'è un errore"""
     return {
         "riassunto": "Errore nell'elaborazione. Riprova.",
         "vettore_attacco": "Non disponibile",
@@ -256,24 +223,21 @@ def get_fallback_analysis():
         "impatto_tecnico": "Non disponibile",
         "mitre_attack_ttp": [],
         "raccomandazioni_difesa": [],
-        "domande_esplorative": []
+        "domande_esplorative": [],
+        "anatomia_attacco": "Nessuna simulazione disponibile causa errore."
     }
 
 def stream_deep_dive(context, question):
-    """Chat esperto con streaming"""
     llm = ChatGroq(temperature=0.3, model_name="llama-3.1-8b-instant", groq_api_key=GROQ_API_KEY)
     prompt = f"""Sei un Senior Security Engineer. RISPONDI RIGOROSAMENTE IN ITALIANO, in modo tecnico e professionale.
 Contesto: {context}
 Domanda dell'utente: {question}
-
-Sii specifico e pratico. Se la domanda riguarda come funziona un attacco, spiega step-by-step.
-Se la domanda riguarda mitigazione, fornisci azioni concrete."""
+Fornisci azioni pratiche e schemi comandi se applicabili."""
     
     for chunk in llm.stream(prompt):
         yield chunk.content
 
 def format_countdown(seconds):
-    """Formatta i secondi in MM:SS"""
     minutes = seconds // 60
     secs = seconds % 60
     return f"{minutes:02d}:{secs:02d}"
@@ -292,7 +256,6 @@ else:
 
     st.sidebar.header("📡 Live Feed Alerts")
     
-    # --- ANIMAZIONE GUFETTO E CONTATORE ---
     col1, col2 = st.sidebar.columns([1, 1])
     with col1:
         st.markdown("""
@@ -305,7 +268,6 @@ else:
     with col2:
         countdown_placeholder = st.sidebar.empty()
     
-    # Inizializzazione del timer
     if 'refresh_start_time' not in st.session_state:
         st.session_state.refresh_start_time = datetime.now()
     
@@ -324,7 +286,7 @@ else:
         </div>
         """, unsafe_allow_html=True)
     
-    st.sidebar.caption("Si aggiorna automaticamente ogni 5 minuti.")
+    st.sidebar.caption("Si aggiorna automaticamente ogni 5 minutes.")
     st.sidebar.markdown('<div class="helper_text">👇 Scegli un bollettino da consultare</div>', unsafe_allow_html=True)
     st.sidebar.divider()
     
@@ -332,12 +294,9 @@ else:
         btn_label = f"{a['source']}\n{a['title'][:50]}..."
         if st.sidebar.button(btn_label, use_container_width=True):
             st.session_state.selected_article = a
-            if 'analysis' in st.session_state: 
-                del st.session_state.analysis
-            if 'deep_dive_response' in st.session_state: 
-                del st.session_state.deep_dive_response
-            if 'trigger_stream' in st.session_state: 
-                del st.session_state.trigger_stream
+            if 'analysis' in st.session_state: del st.session_state.analysis
+            if 'deep_dive_response' in st.session_state: del st.session_state.deep_dive_response
+            if 'trigger_stream' in st.session_state: del st.session_state.trigger_stream
 
     current_art = st.session_state.selected_article
     st.markdown(f"### 📰 {current_art['title']}")
@@ -352,7 +311,9 @@ else:
         analysis = st.session_state.analysis
         st.markdown("---")
         
-        col1, col2 = st.columns([2, 1])
+        # Bilanciamento colonne allargando la colonna di sinistra per l'anatomia dettagliata
+        col1, col2 = st.columns([1.4, 1])
+        
         with col1:
             st.markdown("#### 📝 Riassunto")
             st.info(analysis.get('riassunto', 'Nessun riassunto generato.'))
@@ -364,43 +325,14 @@ else:
                 if submit_chat and custom_q:
                     st.session_state.active_question = custom_q
                     st.session_state.trigger_stream = True
-            
-            # --- SEZIONI TECNICHE DETTAGLIATE ---
-            st.markdown("#### 🎯 Vettore di Attacco")
+
+            # NUOVA SEZIONE SOTTO LA CHAT RICHIESTA DALL'UTENTE
+            st.markdown("#### 🔬 Anatomia dell'Attacco & Scenario di Simulazione")
             st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('vettore_attacco', 'Non disponibile')}
+            <div class="anatomy_section">
+                {analysis.get('anatomia_attacco', 'Simulazione dello scenario non disponibile.')}
             </div>
             """, unsafe_allow_html=True)
-            
-            st.markdown("#### ⚙️ Tecnica di Exploit")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('tecnica_exploit', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("#### 📅 Timeline dell'Attacco")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('timeline_attacco', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("#### 💥 Impatto Tecnico")
-            st.markdown(f"""
-            <div class="technical_section">
-                {analysis.get('impatto_tecnico', 'Non disponibile')}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("#### 🛡️ Raccomandazioni di Difesa")
-            raccomandazioni = analysis.get('raccomandazioni_difesa', [])
-            if isinstance(raccomandazioni, list) and raccomandazioni:
-                for i, rec in enumerate(raccomandazioni, 1):
-                    st.markdown(f"**{i}. {rec}**")
-            else:
-                st.write("Non disponibili")
                     
         with col2:
             st.markdown("#### 🔍 Investigazione Tecnica")
@@ -417,19 +349,54 @@ else:
             ttps = analysis.get('mitre_attack_ttp', [])
             if isinstance(ttps, list) and ttps:
                 for ttp in ttps:
-                    if str(ttp).strip(): 
-                        st.code(str(ttp), language="text")
+                    if str(ttp).strip(): st.code(str(ttp), language="text")
             else:
                 st.write("Nessun pattern tecnico.")
             
-            st.markdown("#### 🔗 Indicatori di Compromissione")
+            st.markdown("#### 🔗 Indicatori di Compromissione (IoC)")
             iocs = analysis.get('indicatori_compromissione', [])
             if isinstance(iocs, list) and iocs:
                 for ioc in iocs:
-                    if str(ioc).strip(): 
-                        st.code(str(ioc), language="text")
+                    if str(ioc).strip(): st.code(str(ioc), language="text")
             else:
-                st.write("Nessun IoC disponibile.")
+                st.write("Nessun IoC disponibile nell'articolo.")
+
+            # SEZIONI SPOSTATE SOTTO LA VOCE INDICATORI DI COMPROMISSIONE
+            st.markdown("##### 🎯 Vettore di Attacco")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('vettore_attacco', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("##### ⚙️ Tecnica di Exploit")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('tecnica_exploit', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("##### 📅 Timeline dell'Attacco")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('timeline_attacco', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("##### 💥 Impatto Tecnico")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('impatto_tecnico', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("##### 🛡️ Raccomandazioni di Difesa")
+            raccomandazioni = analysis.get('raccomandazioni_difesa', [])
+            if isinstance(raccomandazioni, list) and raccomandazioni:
+                for i, rec in enumerate(raccomandazioni, 1):
+                    st.markdown(f"**{i}. {rec}**")
+            else:
+                st.write("Non disponibili")
 
     if st.session_state.get('trigger_stream', False):
         st.markdown("---")
