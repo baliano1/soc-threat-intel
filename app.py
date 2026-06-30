@@ -150,8 +150,8 @@ def analyze_article(title, content):
         "tecnica_exploit": "Testo descrittivo...",
         "impatto_tecnico": "Testo descrittivo...",
         "anatomia_attacco": "Testo con spiegazione...",
-        "mitre_attack_ttp": ["TTP1", "TTP2"],
-        "indicatori_compromissione": ["IoC1", "IoC2"],
+        "mitre_attack_ttp": ["TTP1", "TTP2"], qualora non trovassi informazioni coerenti con un codice MITRE&ATTACK (es. T1566) inserisci "Dato non trovato/non disponibile", 
+        "indicatori_compromissione": ["IoC1", "IoC2"], qualora non trovassi informazioni coerenti con un IOC (IP segnalati, Hash, CVE ecc) inserisci "Dato non trovato/non disponibile",
         "raccomandazioni_difesa": ["Azione 1", "Azione 2"],
         "domande_esplorative": ["Domanda 1", "Domanda 2"],
         "timeline_attacco": [
