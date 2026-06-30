@@ -26,7 +26,7 @@ st.markdown(
 
 st_autorefresh(interval=300000, limit=None, key="feed_autorefresh")
 
-GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 
 # --- FUNZIONI DI SUPPORTO ---
 def clean_html(raw_html):
@@ -65,10 +65,7 @@ def get_severity_indicator(title, content):
     """Assegna un colore in base alla presenza di parole chiave nel titolo e contenuto"""
     text = (title + " " + content).lower()
     
-    # Parole ad alto rischio
     high_keywords = ['ransomware', 'zero-day', '0-day', 'critical', 'exploit', 'breach', 'botnet', 'malicious', 'apt', 'hijack', 'cve-', 'rce', 'data leak', 'cyberattack', 'malware', 'trojan', 'backdoor', 'poison', 'guilty']
-    
-    # Parole a medio rischio
     medium_keywords = ['vulnerability', 'vulnerabilità', 'phishing', 'scam', 'patch', 'update', 'aggiornamento', 'warning', 'avviso', 'flaw', 'bug', 'attack', 'attacco', 'fake', 'spoofing', 'ddos', 'fraud', 'truffa']
     
     if any(k in text for k in high_keywords):
@@ -80,7 +77,6 @@ def get_severity_indicator(title, content):
 
 @st.cache_data(ttl=300)
 def fetch_rss_feeds():
-    # Rimosse le emoji statiche per fare spazio ai pallini di severità dinamici
     feeds = {
         "CSIRT Italia": "https://www.csirt.gov.it/feed/avvisi",
         "RedHotCyber": "https://www.redhotcyber.com/feed/",
@@ -92,24 +88,13 @@ def fetch_rss_feeds():
         "Dark Reading": "https://www.darkreading.com/rss.xml",
         "Malwarebytes Labs": "https://www.malwarebytes.com/feed/",
         "Cisco Talos": "https://blog.talosintelligence.com/feeds/all.xml.rss",
-        "Sophos Labs": "https://www.sophos.com/en-us/press-office/press-releases.aspx",
         "Kaspersky Lab": "https://www.kaspersky.com/blog/feed/",
-        "Ransomware Advisories": "https://www.cisa.gov/sites/default/files/xml/ransomware_advisory.xml",
-        "No More Ransom": "https://www.nomoreransom.org/feed/en.xml",
-        "AWS Security": "https://aws.amazon.com/security/security-updates/",
         "Microsoft Security": "https://msrc.microsoft.com/feed",
         "Google Security": "https://security.googleblog.com/feeds/posts/default",
-        "ICS-CERT Alerts": "https://www.cisa.gov/cybersecurity-alerts-and-advisories/industrial-control-systems.xml",
-        "SCADA Security": "https://www.digitalbond.com/feed/",
-        "NVD (NIST)": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json",
         "Exploit-DB": "https://www.exploit-db.com/rss.xml",
         "Mandiant Blog": "https://www.mandiant.com/resources/blog",
         "CrowdStrike Falcon": "https://www.crowdstrike.com/blog/feed/",
         "Trend Micro": "https://www.trendmicro.com/en_us/research.html",
-        "Zimperium Labs": "https://blog.zimperium.com/feed/",
-        "Cellebrite": "https://www.cellebrite.com/en/blog/",
-        "GDPR.eu": "https://gdpr.eu/rss/",
-        "Privacy Affairs": "https://www.privacyaffairs.com/feed/",
     }
     
     articles = []
@@ -153,7 +138,7 @@ def get_fallback_analysis(errore=""):
 def analyze_article(title, content):
     llm = ChatGroq(
         temperature=0.1, 
-        model_name="llama-3.1-8b-instant", # Manteniamo l'8B per risparmiare token sul JSON
+        model_name="llama-3.1-8b-instant",
         groq_api_key=GROQ_API_KEY,
         max_tokens=4000, 
         model_kwargs={"response_format": {"type": "json_object"}}
@@ -174,13 +159,12 @@ def analyze_article(title, content):
         "tecnica_exploit": "Testo descrittivo...",
         "impatto_tecnico": "Testo descrittivo...",
         "anatomia_attacco": "Testo con spiegazione...",
-        "mitre_attack_ttp": ["TTP1", "TTP2"], qualora non trovassi informazioni coerenti con un codice MITRE&ATTACK (es. T1566) inserisci "Dato non trovato/non disponibile", 
-        "indicatori_compromissione": ["IoC1", "IoC2"], qualora non trovassi informazioni coerenti con un IOC (IP segnalati, Hash, CVE ecc) inserisci "Dato non trovato/non disponibile",
+        "mitre_attack_ttp": ["TTP1", "TTP2"], 
+        "indicatori_compromissione": ["IoC1", "IoC2"], 
         "raccomandazioni_difesa": ["Azione 1", "Azione 2"],
         "domande_esplorative": ["Domanda 1", "Domanda 2"],
         "timeline_attacco": [
-            {{"fase": "Nome fase 1", "descrizione": "Cosa succede qui"}},
-            {{"fase": "Nome fase 2", "descrizione": "Cosa succede qui"}}
+            {{"fase": "Nome fase 1", "descrizione": "Cosa succede qui"}}
         ]
     }}
     
@@ -216,7 +200,7 @@ def analyze_article(title, content):
 def stream_deep_dive(context, question):
     llm = ChatGroq(
         temperature=0.3, 
-        model_name="llama-3.3-70b-versatile", # IL NUOVO AGENTE PER LA CHAT
+        model_name="llama-3.3-70b-versatile",
         groq_api_key=GROQ_API_KEY
     )
     prompt = f"Sei un Security Engineer Senior. Rispondi in italiano in modo molto tecnico. Contesto: {context}. Domanda: {question}"
@@ -269,8 +253,7 @@ else:
         st.divider()
         
         for a in articles:
-            # Qui inseriamo il pallino del rischio dinamico generato in precedenza
-            if st.button(f"{a['emoji']} {a['source']}\n{a['title'][:50]}...", use_container_width=True):
+            if st.button(f"{a.get('emoji', '⚪')} {a['source']}\n{a['title'][:50]}...", use_container_width=True):
                 st.session_state.selected_article = a
                 if 'analysis' in st.session_state: del st.session_state.analysis
                 if 'deep_dive_response' in st.session_state: del st.session_state.deep_dive_response
@@ -279,7 +262,7 @@ else:
 
     current_art = st.session_state.selected_article
     st.markdown(f"### 📰 {current_art['title']}")
-    st.caption(f"**Fonte:** {current_art['source']} | **Rischio Identificato:** {current_art['emoji']} | [Link Ufficiale]({current_art['link']})")
+    st.caption(f"**Fonte:** {current_art['source']} | **Rischio Identificato:** {current_art.get('emoji', '⚪')} | [Link Ufficiale]({current_art['link']})")
     
     content_preview = current_art['content'][:800] + "..." if current_art['content'] else "Testo dell'articolo non estraibile."
     st.write(content_preview)
@@ -304,13 +287,14 @@ else:
             st.markdown("#### 📝 Executive Summary")
             st.info(a.get('riassunto'))
             
-            st.markdown("#### 💬 Chat con l'Esperto SOC (Modello 70B)")
-            with st.form(key="custom_chat_form", clear_on_submit=True):
-                custom_q = st.text_input("Approfondisci tecnicamente questo alert:", max_chars=200)
-                if st.form_submit_button("Invia Domanda") and custom_q:
-                    st.session_state.active_question = custom_q
-                    st.session_state.trigger_stream = True
-                    st.rerun() 
+            # --- SEZIONE RACCOMANDAZIONI SPOSTATA QUI (AL POSTO DELLA CHAT) ---
+            st.markdown("#### 🛡️ Raccomandazioni")
+            with st.container(border=True):
+                recs = a.get('raccomandazioni_difesa', [])
+                if recs:
+                    for i, rec in enumerate(recs, 1): st.markdown(f"**{i}.** {rec}")
+                else:
+                    st.write("Nessuna raccomandazione specifica.")
 
             st.markdown("<br>", unsafe_allow_html=True)
             
@@ -336,7 +320,7 @@ else:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- SEZIONE INFERIORE: Investigazione e Raccomandazioni affiancate ---
+            # --- SEZIONE INFERIORE: Investigazione e Chat affiancate ---
             sub_col1, sub_col2 = st.columns(2)
             
             with sub_col1:
@@ -350,15 +334,49 @@ else:
                             st.rerun() 
                 else:
                     st.write("Nessuna domanda disponibile.")
+                
+                # --- FRECCIA ANIMATA (Appare solo se c'è un'investigazione attiva) ---
+                if st.session_state.get('trigger_stream', False) or st.session_state.get('active_question'):
+                    st.markdown(
+                        """
+                        <div style="display: flex; justify-content: center; margin-top: 20px; margin-bottom: 10px;">
+                            <div style="
+                                width: 40px; 
+                                height: 40px; 
+                                border-radius: 50%; 
+                                background-color: rgba(255, 255, 255, 0.05); 
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                display: flex; 
+                                align-items: center; 
+                                justify-content: center;
+                                animation: bounce 1.5s infinite;
+                            ">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <polyline points="19 12 12 19 5 12"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                        <style>
+                            @keyframes bounce {
+                                0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+                                40% { transform: translateY(8px); }
+                                60% { transform: translateY(4px); }
+                            }
+                        </style>
+                        """,
+                        unsafe_allow_html=True
+                    )
                     
             with sub_col2:
-                st.markdown("#### 🛡️ Raccomandazioni")
-                with st.container(border=True):
-                    recs = a.get('raccomandazioni_difesa', [])
-                    if recs:
-                        for i, rec in enumerate(recs, 1): st.markdown(f"**{i}.** {rec}")
-                    else:
-                        st.write("Nessuna raccomandazione specifica.")
+                # --- CHAT CON L'ESPERTO SPOSTATA QUI ---
+                st.markdown("#### 💬 Chat con l'Esperto SOC")
+                with st.form(key="custom_chat_form", clear_on_submit=True):
+                    custom_q = st.text_input("Approfondisci tecnicamente questo alert:", max_chars=200)
+                    if st.form_submit_button("Invia Domanda") and custom_q:
+                        st.session_state.active_question = custom_q
+                        st.session_state.trigger_stream = True
+                        st.rerun() 
                     
         # --- COLONNA DI DESTRA ---
         with col2:
@@ -394,13 +412,11 @@ else:
         ctx = f"Articolo: {current_art['title']}. Riassunto: {a.get('riassunto')}"
         
         with st.chat_message("assistant", avatar="🤖"):
-            # Genera prima tutta la risposta a schermo usando il 70B
             full_resp = st.write_stream(stream_deep_dive(ctx, st.session_state.active_question))
             
         st.session_state.deep_dive_response = full_resp
         st.session_state.trigger_stream = False
         
-        # ORA ESEGUE LO SCROLL: dopo che la finestra si è ingrandita al massimo
         force_scroll_to_bottom()
         
     elif 'deep_dive_response' in st.session_state and st.session_state.get('active_question'):
