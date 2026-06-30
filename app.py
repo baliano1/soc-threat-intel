@@ -151,7 +151,8 @@ def stream_deep_dive(context, question):
         yield chunk.content
 
 # --- INTERFACCIA UTENTE ---
-st.title("🛡️ SOC Threat Intelligence Explorer")
+st.markdown("<h1 style='text-align: center;'>🛡️ SOC Threat Intelligence Explorer</h1>", unsafe_allow_html=True)
+
 
 with st.spinner("Sincronizzazione Feed RSS in corso..."):
     articles = fetch_rss_feeds()
