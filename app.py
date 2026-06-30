@@ -129,7 +129,6 @@ def analyze_article(title, content):
         
         clean_json = {str(k).lower(): v for k, v in raw_json.items()}
         
-        # Pulizia e validazione stretta dei tipi
         required_lists = ["mitre_attack_ttp", "indicatori_compromissione", "raccomandazioni_difesa", "domande_esplorative", "timeline_attacco"]
         for k in required_lists:
             if k not in clean_json or not isinstance(clean_json[k], list):
@@ -165,7 +164,6 @@ else:
 
     st.sidebar.header("📡 Live Feed Alerts")
     
-    # --- WIDGET UNIFICATO: GUFO + TIMER ---
     sidebar_widget = """
     <div style="text-align: center; font-family: sans-serif; padding: 15px; background: #1e1e1e; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333;">
         <style>
@@ -192,7 +190,6 @@ else:
     </script>
     """
     
-    # Inserimento protetto nella sidebar
     with st.sidebar:
         components.html(sidebar_widget, height=180)
         st.markdown('<p style="color:#888; font-size:13px; text-align:center; margin-top:-10px;">👇 Scegli un bollettino</p>', unsafe_allow_html=True)
@@ -205,12 +202,10 @@ else:
                 if 'deep_dive_response' in st.session_state: del st.session_state.deep_dive_response
                 if 'trigger_stream' in st.session_state: del st.session_state.trigger_stream
 
-    # --- CORPO PRINCIPALE ---
     current_art = st.session_state.selected_article
     st.markdown(f"### 📰 {current_art['title']}")
     st.caption(f"**Fonte:** {current_art['source']} | [Link Ufficiale]({current_art['link']})")
     
-    # Mostriamo solo se c'è testo
     content_preview = current_art['content'][:800] + "..." if current_art['content'] else "Testo dell'articolo non estraibile."
     st.write(content_preview)
 
@@ -243,21 +238,20 @@ else:
             with st.expander("🔬 ANATOMIA DELL'ATTACCO E SIMULAZIONE", expanded=True):
                 st.markdown(a.get('anatomia_attacco'))
                 
-            # --- TIMELINE VISUALE PERSONALIZZATA CSS ---
+            # --- TIMELINE VISUALE CORRETTA (Senza spazi iniziali per evitare formattazione Markdown code block) ---
             with st.expander("⏱️ TIMELINE DELL'ATTACCO", expanded=True):
                 timeline_data = a.get('timeline_attacco', [])
                 if isinstance(timeline_data, list) and len(timeline_data) > 0:
-                    html_timeline = '<div style="border-left: 3px solid #ff4b4b; padding-left: 20px; margin-left: 10px;">'
+                    html_timeline = '<div style="border-left: 3px solid #ff4b4b; padding-left: 20px; margin-left: 10px;">\n'
                     for step in timeline_data:
                         fase = step.get('fase', 'Fase')
                         desc = step.get('descrizione', '')
-                        html_timeline += f"""
-                        <div style="position: relative; margin-bottom: 20px;">
-                            <span style="position: absolute; left: -31px; top: 2px; background-color: #ff4b4b; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #1e1e1e;"></span>
-                            <h5 style="margin:0; color: #ff4b4b;">{fase}</h5>
-                            <p style="margin: 5px 0 0 0; font-size: 14px;">{desc}</p>
-                        </div>
-                        """
+                        # Evitiamo accuratamente le indentazioni qui dentro!
+                        html_timeline += f'<div style="position: relative; margin-bottom: 20px;">\n'
+                        html_timeline += f'<span style="position: absolute; left: -31px; top: 2px; background-color: #ff4b4b; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #1e1e1e;"></span>\n'
+                        html_timeline += f'<h5 style="margin:0; color: #ff4b4b;">{fase}</h5>\n'
+                        html_timeline += f'<p style="margin: 5px 0 0 0; font-size: 14px;">{desc}</p>\n'
+                        html_timeline += f'</div>\n'
                     html_timeline += '</div>'
                     st.markdown(html_timeline, unsafe_allow_html=True)
                 else:
