@@ -186,6 +186,17 @@ def fetch_rss_feeds():
             pass 
     return articles
 
+def extract_json_from_response(response_text):
+    """Estrae JSON valido dalla risposta, rimuovendo markdown code blocks"""
+    # Rimuove markdown code blocks (```json ... ```)
+    if "```" in response_text:
+        start = response_text.find("{")
+        end = response_text.rfind("}") + 1
+        if start != -1 and end > start:
+            response_text = response_text[start:end]
+    
+    return response_text.strip()
+
 def analyze_article(title, content):
     """Analizza l'articolo usando Groq con focus su dettagli dell'attacco"""
     llm = ChatGroq(
@@ -195,43 +206,32 @@ def analyze_article(title, content):
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
-    prompt = f"""Sei un analista di sicurezza informatica. Analizza il seguente alert di sicurezza e genera un JSON valido con queste chiavi esatte (tutte minuscole):
+    prompt = f"""Sei un analista di sicurezza informatica. Analizza il seguente alert di sicurezza e genera un JSON valido.
 
-riassunto, vettore_attacco, tecnica_exploit, timeline_attacco, indicatori_compromissione, impatto_tecnico, mitre_attack_ttp, raccomandazioni_difesa, domande_esplorative
+GENERA SOLO IL JSON, SENZA MARKDOWN, SENZA SPIEGAZIONI.
 
-REGOLE FONDAMENTALI:
-1. Genera SOLO un JSON valido, niente altro
-2. Rispondi rigorosamente in ITALIANO
-3. Per vettore_attacco: spiega come gli attaccanti hanno ottenuto accesso iniziale (phishing, exploit, credenziali, etc)
-4. Per tecnica_exploit: dettagli tecnici specifici (CVE, malware, tecniche di sfruttamento)
-5. Per timeline_attacco: sequenza cronologica step-by-step dell'intera catena d'attacco
-6. Per indicatori_compromissione: lista di IoC (IP, domini, hash, file, porte)
-7. Per impatto_tecnico: cosa è stato compromesso, dati rubati, danno ai sistemi
-8. Per mitre_attack_ttp: codici MITRE Attack (es: T1234 - Nome Tecnica)
-9. Per raccomandazioni_difesa: azioni concrete di prevenzione, detection e risposta
-10. Per domande_esplorative: 3 domande tecniche pertinenti all'attacco
+Chiavi richieste (tutte minuscole):
+- riassunto: breve riassunto 2-3 frasi
+- vettore_attacco: come gli attaccanti hanno ottenuto accesso iniziale
+- tecnica_exploit: tecniche specifiche utilizzate (CVE, malware)
+- timeline_attacco: sequenza cronologica step-by-step
+- indicatori_compromissione: lista di IoC (IP, domini, hash)
+- impatto_tecnico: cosa è stato compromesso e come
+- mitre_attack_ttp: array di codici MITRE (T1234 - Nome)
+- raccomandazioni_difesa: array di azioni di prevenzione
+- domande_esplorative: array di 3 domande tecniche
 
 Titolo: {title}
-
 Contenuto: {content[:2000]}
 
-Genera il JSON con esattamente queste chiavi:
-{{
-  "riassunto": "Breve riassunto 2-3 frasi",
-  "vettore_attacco": "Come hanno ottenuto accesso iniziale",
-  "tecnica_exploit": "Tecniche specifiche utilizzate",
-  "timeline_attacco": "Sequenza chronologica dell'attacco",
-  "indicatori_compromissione": ["IoC1", "IoC2", "IoC3"],
-  "impatto_tecnico": "Cosa è stato compromesso e come",
-  "mitre_attack_ttp": ["T1234 - Tecnica1", "T5678 - Tecnica2"],
-  "raccomandazioni_difesa": ["Azione1", "Azione2", "Azione3"],
-  "domande_esplorative": ["Domanda1?", "Domanda2?", "Domanda3?"]
-}}
+RISPONDI SOLO CON JSON VALIDO:
 """
     
     try:
         response = llm.invoke(prompt)
-        raw_json = json.loads(response.content)
+        # Estrae il JSON dalla risposta
+        json_text = extract_json_from_response(response.content)
+        raw_json = json.loads(json_text)
         
         # Normalizza le chiavi
         clean_json = {str(k).lower(): v for k, v in raw_json.items()}
@@ -245,36 +245,33 @@ Genera il JSON con esattamente queste chiavi:
         
         for key in required_keys:
             if key not in clean_json:
-                clean_json[key] = "Non disponibile"
+                if key in ["indicatori_compromissione", "mitre_attack_ttp", "raccomandazioni_difesa", "domande_esplorative"]:
+                    clean_json[key] = []
+                else:
+                    clean_json[key] = "Non disponibile"
         
         return clean_json
         
     except json.JSONDecodeError as e:
-        st.error(f"Errore nel parsing JSON: {str(e)}")
-        return {
-            "riassunto": "Errore nell'analisi. Riprova.",
-            "vettore_attacco": "Non disponibile",
-            "tecnica_exploit": "Non disponibile",
-            "timeline_attacco": "Non disponibile",
-            "indicatori_compromissione": [],
-            "impatto_tecnico": "Non disponibile",
-            "mitre_attack_ttp": [],
-            "raccomandazioni_difesa": [],
-            "domande_esplorative": []
-        }
+        st.error(f"❌ Errore nel parsing JSON: {str(e)[:100]}")
+        return get_fallback_analysis()
     except Exception as e:
-        st.error(f"Errore durante l'analisi: {str(e)}")
-        return {
-            "riassunto": "Errore nell'analisi. Riprova.",
-            "vettore_attacco": "Non disponibile",
-            "tecnica_exploit": "Non disponibile",
-            "timeline_attacco": "Non disponibile",
-            "indicatori_compromissione": [],
-            "impatto_tecnico": "Non disponibile",
-            "mitre_attack_ttp": [],
-            "raccomandazioni_difesa": [],
-            "domande_esplorative": []
-        }
+        st.error(f"❌ Errore durante l'analisi: {str(e)[:100]}")
+        return get_fallback_analysis()
+
+def get_fallback_analysis():
+    """Ritorna un'analisi di fallback quando c'è un errore"""
+    return {
+        "riassunto": "Errore nell'elaborazione. Riprova.",
+        "vettore_attacco": "Non disponibile",
+        "tecnica_exploit": "Non disponibile",
+        "timeline_attacco": "Non disponibile",
+        "indicatori_compromissione": [],
+        "impatto_tecnico": "Non disponibile",
+        "mitre_attack_ttp": [],
+        "raccomandazioni_difesa": [],
+        "domande_esplorative": []
+    }
 
 def stream_deep_dive(context, question):
     """Chat esperto con streaming"""
