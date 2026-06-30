@@ -94,6 +94,23 @@ st.markdown("""
     margin: 10px 0;
     padding: 5px 0;
 }
+
+.technical_section {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+    border-left: 4px solid #ff6b6b;
+}
+
+.technical_subsection {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 6px;
+    margin: 8px 0;
+    border-left: 3px solid #ffd93d;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -180,21 +197,26 @@ def analyze_article(title, content):
     
     prompt = f"""
     Genera ESCLUSIVAMENTE un oggetto JSON valido. RISPONDI RIGOROSAMENTE IN ITALIANO.
-    Usa ESATTAMENTE queste tre chiavi, rigorosamente in minuscolo: "riassunto", "mitre_attack_ttp", "domande_esplorative".
+    Usa ESATTAMENTE queste chiavi, rigorosamente in minuscolo:
+    "riassunto", "vettore_attacco", "tecnica_exploit", "timeline_attacco", 
+    "indicatori_compromissione", "impatto_tecnico", "mitre_attack_ttp", "raccomandazioni_difesa"
+    
+    IMPORTANTE: Spiega DETTAGLIATAMENTE come gli attaccanti hanno eseguito l'attacco, step-by-step.
     
     Struttura JSON richiesta:
     {{
-        "riassunto": "Riassunto analitico di 4 frasi in italiano (Chi è attaccato, vettore d'attacco, impatto).",
-        "mitre_attack_ttp": ["Lista codici TTP o tecniche citate"],
-        "domande_esplorative": [
-            "Come funziona tecnicamente l'attacco citato?",
-            "Quali sono i metodi di mitigazione in rete?",
-            "Quali IoC cercare nei log?"
-        ]
+        "riassunto": "Riassunto di 3-4 frasi: chi è stato attaccato, quando, che tipo di attacco.",
+        "vettore_attacco": "Come gli attaccanti hanno ottenuto accesso iniziale al sistema? (es: phishing, exploit di vulnerabilità, accesso non autorizzato a servizi esposti, credential stuffing, etc.)",
+        "tecnica_exploit": "Quali tecniche specifiche sono state utilizzate? (es: sfruttamento di CVE-XXXX-XXXXX, uso di malware specifico, SQL injection, RCE, privilege escalation, etc.)",
+        "timeline_attacco": "Sequenza temporale cronologica dell'attacco: 1) Accesso iniziale, 2) Movimento laterale, 3) Esfiltrazione dati, 4) Danno causato",
+        "indicatori_compromissione": ["IoC specifici: indirizzi IP, domini, hash malware, nomi file sospetti, porte utilizzate, etc."],
+        "impatto_tecnico": "Cosa è stato effettivamente compromesso? Quali dati sono stati esfiltrati? Quanti record? Come sono stati rubati? Quale danno è stato causato ai sistemi?",
+        "mitre_attack_ttp": ["T1234 - Tecnica MITRE", "T5678 - Altra Tecnica"],
+        "raccomandazioni_difesa": ["Raccomandazione 1: azione concreta per prevenire", "Raccomandazione 2: azione di detection", "Raccomandazione 3: azione di contenimento"]
     }}
     
     Titolo: {title}
-    Testo: {content[:1500]} 
+    Testo: {content[:2000]} 
     """
     
     # In LangChain i ChatModels restituiscono un oggetto con .content
@@ -214,8 +236,13 @@ def analyze_article(title, content):
     except Exception as e:
         return {
             "riassunto": "Errore di conversione JSON. Riprova l'analisi.",
+            "vettore_attacco": "Non disponibile",
+            "tecnica_exploit": "Non disponibile",
+            "timeline_attacco": "Non disponibile",
+            "indicatori_compromissione": [],
+            "impatto_tecnico": "Non disponibile",
             "mitre_attack_ttp": [],
-            "domande_esplorative": []
+            "raccomandazioni_difesa": []
         }
 
 def stream_deep_dive(context, question):
@@ -224,6 +251,9 @@ def stream_deep_dive(context, question):
     Sei un Senior Security Engineer. RISPONDI RIGOROSAMENTE IN ITALIANO, in modo tecnico e professionale. 
     Contesto: {context}
     Domanda dell'utente: {question}
+    
+    Sii specifico e pratico. Se la domanda riguarda come funziona un attacco, spiega step-by-step.
+    Se la domanda riguarda mitigazione, fornisci azioni concrete che un team SOC può implementare.
     """
     # Adattiamo lo streaming per Streamlit e ChatGroq
     for chunk in llm.stream(prompt):
@@ -321,12 +351,6 @@ else:
             st.markdown("#### 📝 Riassunto")
             st.info(analysis.get('riassunto', 'Nessun riassunto generato.'))
             
-            st.markdown("#### 🔍 Investigazione Tecnica")
-            for domanda in analysis.get('domande_esplorative', []):
-                if st.button(f"🔎 {domanda}", key=domanda):
-                    st.session_state.active_question = domanda
-                    st.session_state.trigger_stream = True
-                    
             st.markdown("#### 💬 Chat con l'esperto")
             with st.form(key="custom_chat_form"):
                 custom_q = st.text_input("Fai una domanda specifica su questo alert (max 200 caratteri):", max_chars=200)
@@ -334,8 +358,51 @@ else:
                 if submit_chat and custom_q:
                     st.session_state.active_question = custom_q
                     st.session_state.trigger_stream = True
+            
+            # --- SEZIONI TECNICHE DETTAGLIATE ---
+            st.markdown("#### 🎯 Vettore di Attacco")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('vettore_attacco', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("#### ⚙️ Tecnica di Exploit")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('tecnica_exploit', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("#### 📅 Timeline dell'Attacco")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('timeline_attacco', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("#### 💥 Impatto Tecnico")
+            st.markdown(f"""
+            <div class="technical_section">
+                {analysis.get('impatto_tecnico', 'Non disponibile')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("#### 🛡️ Raccomandazioni di Difesa")
+            raccomandazioni = analysis.get('raccomandazioni_difesa', [])
+            if isinstance(raccomandazioni, list) and raccomandazioni:
+                for i, rec in enumerate(raccomandazioni, 1):
+                    st.markdown(f"**{i}. {rec}**")
+            else:
+                st.write("Non disponibili")
                     
         with col2:
+            st.markdown("#### 🔍 Investigazione Tecnica")
+            for domanda in analysis.get('domande_esplorative', []):
+                if st.button(f"🔎 {domanda}", key=domanda):
+                    st.session_state.active_question = domanda
+                    st.session_state.trigger_stream = True
+            
             st.markdown("#### 🎯 Tag e TTP Rilevati")
             ttps = analysis.get('mitre_attack_ttp', [])
             if isinstance(ttps, list) and ttps:
@@ -343,12 +410,20 @@ else:
                     if str(ttp).strip(): st.code(str(ttp), language="text")
             else:
                 st.write("Nessun pattern tecnico.")
+            
+            st.markdown("#### 🔗 Indicatori di Compromissione")
+            iocs = analysis.get('indicatori_compromissione', [])
+            if isinstance(iocs, list) and iocs:
+                for ioc in iocs:
+                    if str(ioc).strip(): st.code(str(ioc), language="text")
+            else:
+                st.write("Nessun IoC disponibile.")
 
     if st.session_state.get('trigger_stream', False):
         st.markdown("---")
         st.markdown(f"### 💡 Analisi in tempo reale: *{st.session_state.active_question}*")
         
-        context_text = f"Articolo: {current_art['title']}. Riassunto: {analysis.get('riassunto')}"
+        context_text = f"Articolo: {current_art['title']}. Riassunto: {analysis.get('riassunto')}. Vettore: {analysis.get('vettore_attacco')}. Tecnica: {analysis.get('tecnica_exploit')}"
         
         with st.chat_message("assistant", avatar="🤖"):
             full_response = st.write_stream(stream_deep_dive(context_text, st.session_state.active_question))
