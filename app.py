@@ -95,9 +95,9 @@ def fetch_rss_feeds():
         "Microsoft Security": "https://msrc.microsoft.com/feed",
         "Google Security": "https://security.googleblog.com/feeds/posts/default",
         "Exploit-DB": "https://www.exploit-db.com/rss.xml",
-        "Mandiant Blog": "https://www.mandiant.com/resources/blog",
+        "Mandiant Blog": "https://cloud.google.com/blog/topics/threat-intelligence/feed",
         "CrowdStrike Falcon": "https://www.crowdstrike.com/blog/feed/",
-        "Trend Micro": "https://www.trendmicro.com/en_us/research.html",
+        "Trend Micro": "https://newsroom.trendmicro.com/rss",
     }
     
     articles = []
@@ -162,8 +162,8 @@ def analyze_article(title, content):
         "tecnica_exploit": "Testo descrittivo...",
         "impatto_tecnico": "Testo descrittivo...",
         "anatomia_attacco": "Testo con spiegazione...",
-        "mitre_attack_ttp": ["TTP1", "TTP2"], 
-        "indicatori_compromissione": ["IoC1", "IoC2"], 
+        "mitre_attack_ttp": ["TTP1", "TTP2"], qualora non ne trovassi qualcuno, indica la voce "Dato non trovato/Non disponibile"
+        "indicatori_compromissione": ["IoC1", "IoC2"], qualora non ne trovassi qualcuno, indica la voce "Dato non trovato/Non disponibile"
         "raccomandazioni_difesa": ["Azione 1", "Azione 2"],
         "domande_esplorative": ["Domanda 1", "Domanda 2"],
         "timeline_attacco": [
