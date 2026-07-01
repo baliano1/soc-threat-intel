@@ -457,7 +457,7 @@ st.markdown(
         /* Stile del pulsante */
         .btn-torna-su {
             position: fixed; 
-            bottom: 30px; 
+            bottom: 80px; /* <--- ALZATO DA 30px A 80px PER EVITARE IL LOGO */
             right: 30px; 
             width: 50px; 
             height: 50px; 
