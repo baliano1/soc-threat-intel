@@ -337,7 +337,8 @@ else:
                 
                 # --- FRECCIA ANIMATA (Appare solo se c'è un'investigazione attiva) ---
                # --- FRECCIA ANIMATA (Fluttuante, scompare da sola dopo 3.5 secondi) ---
-                if st.session_state.get('trigger_stream', False):
+               # --- FRECCIA ANIMATA (Appare se c'è testo a fondo pagina o in generazione, scompare dopo 3.5s) ---
+                if st.session_state.get('trigger_stream', False) or st.session_state.get('deep_dive_response'):
                     st.markdown(
                         """
                         <div style="
