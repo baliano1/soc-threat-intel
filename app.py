@@ -287,7 +287,7 @@ else:
             st.markdown("#### 📝 Executive Summary")
             st.info(a.get('riassunto'))
             
-            # --- SEZIONE RACCOMANDAZIONI SPOSTATA QUI (AL POSTO DELLA CHAT) ---
+            # --- SEZIONE RACCOMANDAZIONI ---
             st.markdown("#### 🛡️ Raccomandazioni")
             with st.container(border=True):
                 recs = a.get('raccomandazioni_difesa', [])
@@ -334,60 +334,9 @@ else:
                             st.rerun() 
                 else:
                     st.write("Nessuna domanda disponibile.")
-                
-                # --- FRECCIA ANIMATA (Appare solo se c'è un'investigazione attiva) ---
-               # --- FRECCIA ANIMATA (Fluttuante, scompare da sola dopo 3.5 secondi) ---
-               # --- FRECCIA ANIMATA (Appare se c'è testo a fondo pagina o in generazione, scompare dopo 3.5s) ---
-                if st.session_state.get('trigger_stream', False) or st.session_state.get('deep_dive_response'):
-                    st.markdown(
-                        """
-                        <div style="
-                            position: fixed; 
-                            bottom: 40px; 
-                            left: 50%; 
-                            transform: translateX(-50%);
-                            z-index: 99999;
-                            animation: fadeOut 0.5s ease-out 3.5s forwards;
-                        ">
-                            <div style="
-                                width: 45px; 
-                                height: 45px; 
-                                border-radius: 50%; 
-                                background-color: rgba(20, 20, 20, 0.95); 
-                                border: 1px solid rgba(255, 255, 255, 0.2);
-                                display: flex; 
-                                align-items: center; 
-                                justify-content: center;
-                                box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-                                animation: bounce 1.5s infinite;
-                            ">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <polyline points="19 12 12 19 5 12"></polyline>
-                                </svg>
-                            </div>
-                        </div>
-                        <style>
-                            @keyframes bounce {
-                                0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-                                40% { transform: translateY(8px); }
-                                60% { transform: translateY(4px); }
-                            }
-                            /* Dopo 3.5s di attesa, va a opacità 0 e sparisce */
-                            @keyframes fadeOut {
-                                to { 
-                                    opacity: 0; 
-                                    visibility: hidden; 
-                                    pointer-events: none; 
-                                }
-                            }
-                        </style>
-                        """,
-                        unsafe_allow_html=True
-                    )
                     
             with sub_col2:
-                # --- CHAT CON L'ESPERTO SPOSTATA QUI ---
+                # --- CHAT CON L'ESPERTO ---
                 st.markdown("#### 💬 Chat con l'Esperto SOC")
                 with st.form(key="custom_chat_form", clear_on_submit=True):
                     custom_q = st.text_input("Approfondisci tecnicamente questo alert:", max_chars=200)
@@ -424,6 +373,53 @@ else:
                 st.write(a.get('impatto_tecnico'))
 
     # --- SEZIONE RISPOSTA E TRIGGER SCROLL ---
+    
+    # 1. LOGICA FRECCIA GIÙ: Appare sia in generazione (trigger_stream) sia se c'è già una risposta (deep_dive_response).
+    # Ripartirà automaticamente da sola per 3.5 secondi ad ogni nuova domanda perché il componente viene ridisegnato.
+    if st.session_state.get('trigger_stream', False) or st.session_state.get('deep_dive_response'):
+        st.markdown(
+            """
+            <div style="
+                position: fixed; 
+                bottom: 40px; 
+                left: 50%; 
+                transform: translateX(-50%);
+                z-index: 99998;
+                animation: fadeOut 0.5s ease-out 3.5s forwards;
+            ">
+                <div style="
+                    width: 45px; 
+                    height: 45px; 
+                    border-radius: 50%; 
+                    background-color: rgba(20, 20, 20, 0.95); 
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+                    animation: bounce 1.5s infinite;
+                ">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <polyline points="19 12 12 19 5 12"></polyline>
+                    </svg>
+                </div>
+            </div>
+            <style>
+                @keyframes bounce {
+                    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+                    40% { transform: translateY(8px); }
+                    60% { transform: translateY(4px); }
+                }
+                @keyframes fadeOut {
+                    to { opacity: 0; visibility: hidden; pointer-events: none; }
+                }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+    # 2. RENDERIZZAZIONE DELLA RISPOSTA
     if st.session_state.get('trigger_stream', False):
         st.markdown("---")
         st.markdown(f"### 💡 Risposta in tempo reale: *{st.session_state.active_question}*")
@@ -434,7 +430,6 @@ else:
             
         st.session_state.deep_dive_response = full_resp
         st.session_state.trigger_stream = False
-        
         force_scroll_to_bottom()
         
     elif 'deep_dive_response' in st.session_state and st.session_state.get('active_question'):
@@ -444,3 +439,35 @@ else:
             st.write(st.session_state.deep_dive_response)
         
         force_scroll_to_bottom()
+
+# --- PULSANTE "TORNA SU" (SCROLL TO TOP) SEMPRE PRESENTE ---
+# Posizionato alla fine dello script per garantire che venga iniettato su tutta la pagina.
+st.markdown(
+    """
+    <div onclick="
+        const main = window.parent.document.querySelector('.main') || window.parent.document.querySelector('.block-container');
+        if(main) { main.scrollTo({top: 0, behavior: 'smooth'}); }
+    " style="
+        position: fixed; 
+        bottom: 30px; 
+        right: 30px; 
+        width: 50px; 
+        height: 50px; 
+        background-color: #ff4b4b; 
+        border-radius: 50%; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        cursor: pointer; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+        z-index: 99999; 
+        transition: transform 0.2s;
+    " onmouseover="this.style.transform='scale(1.1)';" onmouseout="this.style.transform='scale(1)';">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
