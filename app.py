@@ -162,8 +162,8 @@ def analyze_article(title, content):
         "tecnica_exploit": "Testo descrittivo...",
         "impatto_tecnico": "Testo descrittivo...",
         "anatomia_attacco": "Testo con spiegazione...",
-        "mitre_attack_ttp": ["TTP1", "TTP2"], qualora non ne trovassi qualcuno, indica la voce "Dato non trovato/Non disponibile"
-        "indicatori_compromissione": ["IoC1", "IoC2"], qualora non ne trovassi qualcuno, indica la voce "Dato non trovato/Non disponibile"
+        "mitre_attack_ttp": ["TTP1", "TTP2"], qualora non ne trovassi qualcuno, indica la voce "Dato non trovato/Non disponibile. Non mettere MAI solo TTP1, TTP2 ecc"
+        "indicatori_compromissione": ["IoC1", "IoC2"], qualora non ne trovassi qualcuno, indica la voce "Dato non trovato/Non disponibile. Non mettere MAI solo IoC1, IoC2 ecc"
         "raccomandazioni_difesa": ["Azione 1", "Azione 2"],
         "domande_esplorative": ["Domanda 1", "Domanda 2"],
         "timeline_attacco": [
@@ -206,7 +206,7 @@ def stream_deep_dive(context, question):
         model_name="llama-3.3-70b-versatile",
         groq_api_key=GROQ_API_KEY
     )
-    prompt = f"Sei un Security Engineer Senior. Rispondi in italiano in modo molto tecnico. Contesto: {context}. Domanda: {question}"
+    prompt = f"Sei un Security Engineer Senior. Rispondi in italiano in modo molto tecnico e non devi MAI dare risposte che siano al di fuori del contesto. Devi esclusivamente parlare di Cybersecurity, per tutto il resto non devi rispondere. Se necessario, crea anche degli schemi, delle mappe concettuali, degli script o delle immagini per far comprendere al meglio l'argomento richiesto. Contesto: {context}. Domanda: {question}"
     for chunk in llm.stream(prompt):
         yield chunk.content
 
