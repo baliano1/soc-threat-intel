@@ -336,7 +336,7 @@ else:
                     st.write("Nessuna domanda disponibile.")
                 
                 # --- FRECCIA ANIMATA (Appare solo se c'è un'investigazione attiva) ---
-                if st.session_state.get('trigger_stream', False) or st.session_state.get('active_question'):
+                if st.session_state.get('trigger_stream', False):
                     st.markdown(
                         """
                         <div style="display: flex; justify-content: center; margin-top: 20px; margin-bottom: 10px;">
