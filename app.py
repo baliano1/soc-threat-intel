@@ -442,12 +442,11 @@ else:
 
 # --- PULSANTE "TORNA SU" (SCROLL TO TOP) SEMPRE PRESENTE ---
 # Posizionato alla fine dello script per garantire che venga iniettato su tutta la pagina.
+# --- PULSANTE "TORNA SU" (SCROLL TO TOP) SEMPRE PRESENTE ---
+# 1. Disegniamo il bottone (assegnandogli un ID specifico "btn-torna-su")
 st.markdown(
     """
-    <div onclick="
-        const main = window.parent.document.querySelector('.main') || window.parent.document.querySelector('.block-container');
-        if(main) { main.scrollTo({top: 0, behavior: 'smooth'}); }
-    " style="
+    <div id="btn-torna-su" style="
         position: fixed; 
         bottom: 30px; 
         right: 30px; 
@@ -462,7 +461,7 @@ st.markdown(
         box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
         z-index: 99999; 
         transition: transform 0.2s;
-    " onmouseover="this.style.transform='scale(1.1)';" onmouseout="this.style.transform='scale(1)';">
+    ">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="19" x2="12" y2="5"></line>
             <polyline points="5 12 12 5 19 12"></polyline>
@@ -470,4 +469,29 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
+)
+
+# 2. Iniettiamo il JavaScript da un'area sicura per renderlo cliccabile
+components.html(
+    """
+    <script>
+        const doc = window.parent.document;
+        const btn = doc.getElementById('btn-torna-su');
+        
+        if (btn) {
+            // Ricreiamo l'effetto hover
+            btn.onmouseover = function() { this.style.transform = 'scale(1.1)'; }
+            btn.onmouseout = function() { this.style.transform = 'scale(1)'; }
+            
+            // Azione di scroll verso l'alto
+            btn.onclick = function() {
+                const scrollContainer = doc.querySelector('.main') || doc.querySelector('.stApp');
+                if (scrollContainer) {
+                    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            };
+        }
+    </script>
+    """,
+    height=0
 )
