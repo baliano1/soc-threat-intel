@@ -336,22 +336,31 @@ else:
                     st.write("Nessuna domanda disponibile.")
                 
                 # --- FRECCIA ANIMATA (Appare solo se c'è un'investigazione attiva) ---
+               # --- FRECCIA ANIMATA (Fluttuante, scompare da sola dopo 3.5 secondi) ---
                 if st.session_state.get('trigger_stream', False):
                     st.markdown(
                         """
-                        <div style="display: flex; justify-content: center; margin-top: 20px; margin-bottom: 10px;">
+                        <div style="
+                            position: fixed; 
+                            bottom: 40px; 
+                            left: 50%; 
+                            transform: translateX(-50%);
+                            z-index: 99999;
+                            animation: fadeOut 0.5s ease-out 3.5s forwards;
+                        ">
                             <div style="
-                                width: 40px; 
-                                height: 40px; 
+                                width: 45px; 
+                                height: 45px; 
                                 border-radius: 50%; 
-                                background-color: rgba(255, 255, 255, 0.05); 
+                                background-color: rgba(20, 20, 20, 0.95); 
                                 border: 1px solid rgba(255, 255, 255, 0.2);
                                 display: flex; 
                                 align-items: center; 
                                 justify-content: center;
+                                box-shadow: 0 4px 15px rgba(0,0,0,0.6);
                                 animation: bounce 1.5s infinite;
                             ">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
                                     <polyline points="19 12 12 19 5 12"></polyline>
                                 </svg>
@@ -362,6 +371,14 @@ else:
                                 0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
                                 40% { transform: translateY(8px); }
                                 60% { transform: translateY(4px); }
+                            }
+                            /* Dopo 3.5s di attesa, va a opacità 0 e sparisce */
+                            @keyframes fadeOut {
+                                to { 
+                                    opacity: 0; 
+                                    visibility: hidden; 
+                                    pointer-events: none; 
+                                }
                             }
                         </style>
                         """,
