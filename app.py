@@ -472,6 +472,7 @@ st.markdown(
 )
 
 # 2. Iniettiamo il JavaScript da un'area sicura per renderlo cliccabile
+# 2. Iniettiamo il JavaScript corazzato per lo scroll
 components.html(
     """
     <script>
@@ -479,16 +480,33 @@ components.html(
         const btn = doc.getElementById('btn-torna-su');
         
         if (btn) {
-            // Ricreiamo l'effetto hover
+            // Effetto hover
             btn.onmouseover = function() { this.style.transform = 'scale(1.1)'; }
             btn.onmouseout = function() { this.style.transform = 'scale(1)'; }
             
-            // Azione di scroll verso l'alto
+            // Azione di scroll infallibile
             btn.onclick = function() {
-                const scrollContainer = doc.querySelector('.main') || doc.querySelector('.stApp');
-                if (scrollContainer) {
-                    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-                }
+                // Lista di tutti i possibili contenitori di scroll in Streamlit
+                const containers = [
+                    doc.querySelector('[data-testid="stAppViewContainer"]'), // Versione recente
+                    doc.querySelector('.main'),                              // Versione classica
+                    doc.documentElement,                                     // Fallback HTML
+                    doc.body                                                 // Fallback Body
+                ];
+                
+                // Manda il comando a tutti
+                containers.forEach(container => {
+                    if (container) {
+                        try {
+                            container.scrollTo({ top: 0, behavior: 'smooth' });
+                        } catch(e) {}
+                    }
+                });
+                
+                // Ultima spiaggia assoluta: la finestra del browser genitore
+                try {
+                    window.parent.scrollTo({ top: 0, behavior: 'smooth' });
+                } catch(e) {}
             };
         }
     </script>
