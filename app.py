@@ -11,6 +11,9 @@ import streamlit.components.v1 as components
 # --- 1. CONFIGURAZIONE PAGINA (DEVE ESSERE IL PRIMO COMANDO) ---
 st.set_page_config(page_title="SOC Threat Intel Dashboard", layout="wide", initial_sidebar_state="expanded")
 
+# Inseriamo un ancoraggio invisibile in cima alla pagina
+st.markdown('<div id="ancora-cima"></div>', unsafe_allow_html=True)
+
 # --- 2. CSS PER RIMUOVERE IL MARGINE SUPERIORE E JS PER SCROLL ---
 st.markdown(
     """
@@ -444,72 +447,43 @@ else:
 # Posizionato alla fine dello script per garantire che venga iniettato su tutta la pagina.
 # --- PULSANTE "TORNA SU" (SCROLL TO TOP) SEMPRE PRESENTE ---
 # 1. Disegniamo il bottone (assegnandogli un ID specifico "btn-torna-su")
+# --- PULSANTE "TORNA SU" INFALLIBILE (PURO HTML/CSS, NIENTE JAVASCRIPT) ---
 st.markdown(
     """
-    <div id="btn-torna-su" style="
-        position: fixed; 
-        bottom: 30px; 
-        right: 30px; 
-        width: 50px; 
-        height: 50px; 
-        background-color: #ff4b4b; 
-        border-radius: 50%; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        cursor: pointer; 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
-        z-index: 99999; 
-        transition: transform 0.2s;
-    ">
+    <style>
+        /* Aggiunge fluidità allo scroll nativo del browser */
+        html { scroll-behavior: smooth; }
+        
+        /* Stile del pulsante */
+        .btn-torna-su {
+            position: fixed; 
+            bottom: 30px; 
+            right: 30px; 
+            width: 50px; 
+            height: 50px; 
+            background-color: #ff4b4b; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+            z-index: 99999; 
+            transition: transform 0.2s ease-in-out;
+            text-decoration: none; /* Rimuove la sottolineatura del link */
+        }
+        
+        /* Animazione al passaggio del mouse gestita dal CSS! */
+        .btn-torna-su:hover {
+            transform: scale(1.1);
+        }
+    </style>
+    
+    <a href="#ancora-cima" target="_self" class="btn-torna-su">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="19" x2="12" y2="5"></line>
             <polyline points="5 12 12 5 19 12"></polyline>
         </svg>
-    </div>
+    </a>
     """,
     unsafe_allow_html=True
-)
-
-# 2. Iniettiamo il JavaScript da un'area sicura per renderlo cliccabile
-# 2. Iniettiamo il JavaScript corazzato per lo scroll
-components.html(
-    """
-    <script>
-        const doc = window.parent.document;
-        const btn = doc.getElementById('btn-torna-su');
-        
-        if (btn) {
-            // Effetto hover
-            btn.onmouseover = function() { this.style.transform = 'scale(1.1)'; }
-            btn.onmouseout = function() { this.style.transform = 'scale(1)'; }
-            
-            // Azione di scroll infallibile
-            btn.onclick = function() {
-                // Lista di tutti i possibili contenitori di scroll in Streamlit
-                const containers = [
-                    doc.querySelector('[data-testid="stAppViewContainer"]'), // Versione recente
-                    doc.querySelector('.main'),                              // Versione classica
-                    doc.documentElement,                                     // Fallback HTML
-                    doc.body                                                 // Fallback Body
-                ];
-                
-                // Manda il comando a tutti
-                containers.forEach(container => {
-                    if (container) {
-                        try {
-                            container.scrollTo({ top: 0, behavior: 'smooth' });
-                        } catch(e) {}
-                    }
-                });
-                
-                // Ultima spiaggia assoluta: la finestra del browser genitore
-                try {
-                    window.parent.scrollTo({ top: 0, behavior: 'smooth' });
-                } catch(e) {}
-            };
-        }
-    </script>
-    """,
-    height=0
 )
